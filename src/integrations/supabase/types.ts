@@ -9,7 +9,175 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      arguments: {
+        Row: {
+          content: string
+          created_at: string | null
+          debate_id: string
+          id: string
+          position: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          debate_id: string
+          id?: string
+          position: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          debate_id?: string
+          id?: string
+          position?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arguments_debate_id_fkey"
+            columns: ["debate_id"]
+            isOneToOne: false
+            referencedRelation: "debates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debates: {
+        Row: {
+          argument_count: number | null
+          category: string
+          created_at: string | null
+          created_by: string
+          description: string
+          ends_at: string
+          featured: boolean | null
+          id: string
+          participant_count: number | null
+          status: string
+          title: string
+        }
+        Insert: {
+          argument_count?: number | null
+          category: string
+          created_at?: string | null
+          created_by: string
+          description: string
+          ends_at: string
+          featured?: boolean | null
+          id?: string
+          participant_count?: number | null
+          status?: string
+          title: string
+        }
+        Update: {
+          argument_count?: number | null
+          category?: string
+          created_at?: string | null
+          created_by?: string
+          description?: string
+          ends_at?: string
+          featured?: boolean | null
+          id?: string
+          participant_count?: number | null
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          expertise_areas: string[] | null
+          full_name: string | null
+          id: string
+          location: string | null
+          social_links: Json | null
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          expertise_areas?: string[] | null
+          full_name?: string | null
+          id: string
+          location?: string | null
+          social_links?: Json | null
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          expertise_areas?: string[] | null
+          full_name?: string | null
+          id?: string
+          location?: string | null
+          social_links?: Json | null
+          username?: string
+        }
+        Relationships: []
+      }
+      user_achievements: {
+        Row: {
+          achievement_type: string
+          earned_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          achievement_type: string
+          earned_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          achievement_type?: string
+          earned_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      votes: {
+        Row: {
+          argument_id: string
+          created_at: string | null
+          id: string
+          user_id: string
+          vote_type: boolean
+        }
+        Insert: {
+          argument_id: string
+          created_at?: string | null
+          id?: string
+          user_id: string
+          vote_type: boolean
+        }
+        Update: {
+          argument_id?: string
+          created_at?: string | null
+          id?: string
+          user_id?: string
+          vote_type?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_argument_id_fkey"
+            columns: ["argument_id"]
+            isOneToOne: false
+            referencedRelation: "arguments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

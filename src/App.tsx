@@ -11,6 +11,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import CreateDebatePage from "./pages/CreateDebatePage";
 import DebateDetailPage from "./pages/DebateDetailPage";
+import DebatesPage from "./pages/DebatesPage";
 import UserProfilePage from "./pages/UserProfilePage";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/debates" element={<DebatesPage />} />
             <Route path="/debates/create" element={<CreateDebatePage />} />
             <Route path="/debates/:id" element={<DebateDetailPage />} />
             <Route path="/profile/:username" element={<UserProfilePage />} />

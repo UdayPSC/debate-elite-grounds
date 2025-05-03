@@ -23,8 +23,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <nav className="hidden md:flex ml-8 space-x-6">
               <Link to="/" className="text-eliteDarkGray hover:text-elitePurple transition-colors">Home</Link>
               <Link to="/debates" className="text-eliteDarkGray hover:text-elitePurple transition-colors">Debates</Link>
-              <Link to="/leaderboard" className="text-eliteDarkGray hover:text-elitePurple transition-colors">Leaderboard</Link>
-              <Link to="/about" className="text-eliteDarkGray hover:text-elitePurple transition-colors">About</Link>
             </nav>
           </div>
           
