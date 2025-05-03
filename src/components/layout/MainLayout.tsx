@@ -1,16 +1,88 @@
 
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Search, User, LogIn, Plus, Home } from "lucide-react";
+import { Search, User, LogIn, Plus, Home, LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
-  // In a real app, we would use authentication context
-  const isLoggedIn = false;
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check current auth state on component mount
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getSession();
+      setIsLoggedIn(!!data.session);
+      
+      if (data.session?.user) {
+        // Get user profile info if available
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', data.session.user.id)
+          .single();
+          
+        if (profileData) {
+          setUsername(profileData.username);
+        }
+      }
+    };
+    
+    checkUser();
+    
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsLoggedIn(!!session);
+      
+      // Handle sign in and sign out events
+      if (event === 'SIGNED_IN' && session) {
+        // Get user profile info
+        setTimeout(async () => {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profileData) {
+            setUsername(profileData.username);
+          }
+        }, 0);
+      } else if (event === 'SIGNED_OUT') {
+        setUsername(null);
+      }
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        toast.error("Error signing out", {
+          description: error.message
+        });
+        return;
+      }
+      
+      toast.success("Signed out successfully");
+      navigate("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("An unexpected error occurred");
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-eliteGray">
@@ -49,11 +121,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                     <span className="hidden sm:inline">New Debate</span>
                   </Link>
                 </Button>
-                <Link to="/profile">
-                  <div className="h-8 w-8 bg-elitePurple rounded-full flex items-center justify-center text-white">
-                    <User className="h-4 w-4" />
-                  </div>
-                </Link>
+                <div className="flex items-center space-x-2">
+                  <Link to={`/profile/${username}`} className="flex items-center">
+                    <div className="h-8 w-8 bg-elitePurple rounded-full flex items-center justify-center text-white">
+                      <User className="h-4 w-4" />
+                    </div>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="flex items-center text-eliteDarkGray hover:text-elitePurple"
+                  >
+                    <LogOut className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">Logout</span>
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex items-center space-x-3">
@@ -95,10 +178,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <Plus className="h-5 w-5" />
               <span className="text-xs mt-1">Create</span>
             </Link>
-            <Link to="/login" className="flex flex-col items-center p-2 text-eliteDarkGray">
-              <User className="h-5 w-5" />
-              <span className="text-xs mt-1">Profile</span>
-            </Link>
+            {isLoggedIn ? (
+              <Link to={`/profile/${username}`} className="flex flex-col items-center p-2 text-eliteDarkGray">
+                <User className="h-5 w-5" />
+                <span className="text-xs mt-1">Profile</span>
+              </Link>
+            ) : (
+              <Link to="/login" className="flex flex-col items-center p-2 text-eliteDarkGray">
+                <LogIn className="h-5 w-5" />
+                <span className="text-xs mt-1">Login</span>
+              </Link>
+            )}
           </div>
         </div>
       </header>
