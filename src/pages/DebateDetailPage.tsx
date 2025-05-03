@@ -17,13 +17,13 @@ const DebateDetailPage = () => {
   
   // In a real app, we would fetch the debate and arguments from API
   const debate = id ? getDebate(id) : undefined;
-  const arguments = id ? getDebateArguments(id) : [];
+  const debateArguments = id ? getDebateArguments(id) : [];
   const creator = debate ? getUser(debate.createdBy) : undefined;
   
-  const forArguments = arguments.filter(arg => arg.position === "for")
+  const forArguments = debateArguments.filter(arg => arg.position === "for")
     .sort((a, b) => (b.votes.upvotes - b.votes.downvotes) - (a.votes.upvotes - a.votes.downvotes));
     
-  const againstArguments = arguments.filter(arg => arg.position === "against")
+  const againstArguments = debateArguments.filter(arg => arg.position === "against")
     .sort((a, b) => (b.votes.upvotes - b.votes.downvotes) - (a.votes.upvotes - a.votes.downvotes));
   
   const timeRemaining = () => {
