@@ -74,13 +74,13 @@ const DebateDetailPage = () => {
         .from('arguments')
         .select(`
           *,
-          profiles: user_id (*)
+          profiles:user_id(*)
         `)
         .eq('debate_id', id)
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      return data as ArgumentRow[];
+      return data as unknown as ArgumentRow[];
     },
     enabled: !!id
   });
@@ -89,15 +89,17 @@ const DebateDetailPage = () => {
   const { data: votes } = useQuery({
     queryKey: ['argumentVotes', id],
     queryFn: async () => {
-      if (!id) return [];
+      if (!id || !argumentRows?.length) return {};
       
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
       
+      const argIds = argumentRows.map(arg => arg.id);
+      
       const { data, error } = await supabase
         .from('votes')
         .select('*')
-        .eq('argument_id', argumentRows?.map(arg => arg.id) || []);
+        .in('argument_id', argIds);
         
       if (error) throw error;
       
@@ -156,7 +158,7 @@ const DebateDetailPage = () => {
           event: '*',
           schema: 'public',
           table: 'votes',
-          filter: `argument_id=in.(${argumentRows?.map(arg => arg.id).join(',') || ''})`
+          filter: argumentRows?.length ? `argument_id=in.(${argumentRows.map(arg => arg.id).join(',')})` : undefined
         },
         () => {
           // Invalidate and refetch votes when changes happen
