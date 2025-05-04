@@ -1,5 +1,6 @@
 
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { categories } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
 
 const CreateDebatePage = () => {
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -25,10 +30,74 @@ const CreateDebatePage = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, we would submit the form to API
-    console.log("Submitting debate:", formData);
+    
+    // Check if user is logged in
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    if (!sessionData.session) {
+      toast.error("You must be logged in to create a debate", {
+        description: "Please log in and try again."
+      });
+      navigate("/login");
+      return;
+    }
+    
+    if (!formData.title || !formData.description || !formData.category) {
+      toast.error("Missing required fields", {
+        description: "Please fill in all required fields."
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Calculate end date based on duration
+      const endsAt = new Date();
+      endsAt.setDate(endsAt.getDate() + parseInt(formData.duration));
+      
+      // Submit to Supabase
+      const { data, error } = await supabase
+        .from('debates')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          created_by: sessionData.session.user.id,
+          ends_at: endsAt.toISOString(),
+          status: 'active',
+          argument_count: 0,
+          participant_count: 0
+        })
+        .select();
+        
+      if (error) {
+        console.error("Error creating debate:", error);
+        toast.error("Failed to create debate", {
+          description: error.message
+        });
+        return;
+      }
+      
+      toast.success("Debate created successfully!", {
+        description: "Your debate is now live."
+      });
+      
+      // Navigate to the newly created debate
+      if (data && data.length > 0) {
+        navigate(`/debates/${data[0].id}`);
+      } else {
+        navigate("/debates");
+      }
+      
+    } catch (error) {
+      console.error("Error creating debate:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -112,9 +181,19 @@ const CreateDebatePage = () => {
               
               <div className="pt-4">
                 <div className="flex justify-end gap-4">
-                  <Button variant="outline" type="button">Preview</Button>
-                  <Button type="submit" className="bg-elitePurple hover:bg-elitePurple/90 text-white">
-                    Create Debate
+                  <Button 
+                    variant="outline" 
+                    type="button" 
+                    onClick={() => navigate('/debates')}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="bg-elitePurple hover:bg-elitePurple/90 text-white"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Creating..." : "Create Debate"}
                   </Button>
                 </div>
               </div>

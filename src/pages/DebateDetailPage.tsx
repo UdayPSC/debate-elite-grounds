@@ -1,36 +1,104 @@
 
 import React, { useState } from "react";
-import { useParams } from "react-router-dom";
-import { getDebate, getDebateArguments, getUser } from "@/data/mockData";
+import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import ArgumentCard from "@/components/debates/ArgumentCard";
-import { MessageSquare, Users, Clock } from "lucide-react";
+import { MessageSquare, Users, Clock, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "@/components/ui/sonner";
+import { Database } from "@/integrations/supabase/types";
+
+type Debate = Database['public']['Tables']['debates']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type Argument = Database['public']['Tables']['arguments']['Row'] & {
+  profiles: Profile;
+  votes: { upvotes: number; downvotes: number };
+};
 
 const DebateDetailPage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [position, setPosition] = useState<"for" | "against">("for");
   const [argument, setArgument] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // In a real app, we would fetch the debate and arguments from API
-  const debate = id ? getDebate(id) : undefined;
-  const debateArguments = id ? getDebateArguments(id) : [];
-  const creator = debate ? getUser(debate.createdBy) : undefined;
+  // Fetch debate details
+  const { data: debate, isLoading: isDebateLoading, error: debateError } = useQuery({
+    queryKey: ['debate', id],
+    queryFn: async () => {
+      if (!id) return null;
+      
+      const { data, error } = await supabase
+        .from('debates')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (error) throw error;
+      return data as Debate;
+    },
+    enabled: !!id
+  });
   
-  const forArguments = debateArguments.filter(arg => arg.position === "for")
-    .sort((a, b) => (b.votes.upvotes - b.votes.downvotes) - (a.votes.upvotes - a.votes.downvotes));
-    
-  const againstArguments = debateArguments.filter(arg => arg.position === "against")
-    .sort((a, b) => (b.votes.upvotes - b.votes.downvotes) - (a.votes.upvotes - a.votes.downvotes));
+  // Fetch creator details
+  const { data: creator, isLoading: isCreatorLoading } = useQuery({
+    queryKey: ['debateCreator', debate?.created_by],
+    queryFn: async () => {
+      if (!debate?.created_by) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', debate.created_by)
+        .single();
+        
+      if (error) throw error;
+      return data as Profile;
+    },
+    enabled: !!debate?.created_by
+  });
+  
+  // Fetch arguments
+  const { data: arguments, isLoading: areArgumentsLoading } = useQuery({
+    queryKey: ['debateArguments', id],
+    queryFn: async () => {
+      if (!id) return [];
+      
+      const { data, error } = await supabase
+        .from('arguments')
+        .select(`
+          *,
+          profiles: user_id (*)
+        `)
+        .eq('debate_id', id)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      
+      // Process arguments to include vote counts
+      // In a real app, we would fetch actual votes from the database
+      return (data || []).map(arg => ({
+        ...arg,
+        votes: { upvotes: 0, downvotes: 0 } // Placeholder for actual vote counts
+      })) as Argument[];
+    },
+    enabled: !!id
+  });
+  
+  const forArguments = arguments?.filter(arg => arg.position === "for") || [];
+  const againstArguments = arguments?.filter(arg => arg.position === "against") || [];
   
   const timeRemaining = () => {
-    if (!debate) return "";
+    if (!debate?.ends_at) return "";
     
     const now = new Date();
-    const diff = debate.endsAt.getTime() - now.getTime();
+    const endsAt = new Date(debate.ends_at);
+    const diff = endsAt.getTime() - now.getTime();
     
     // If debate has ended
     if (diff <= 0) return "Debate ended";
@@ -45,14 +113,78 @@ const DebateDetailPage = () => {
     }
   };
   
-  const handleSubmitArgument = (e: React.FormEvent) => {
+  const handleSubmitArgument = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, we would submit the argument to API
-    console.log("Submitting argument:", { position, argument });
-    setArgument("");
+    
+    // Check if user is logged in
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    if (!sessionData.session) {
+      toast.error("You must be logged in to submit an argument", {
+        description: "Please log in and try again."
+      });
+      navigate("/login");
+      return;
+    }
+    
+    if (!argument.trim()) {
+      toast.error("Argument cannot be empty", {
+        description: "Please provide your argument."
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const { error } = await supabase
+        .from('arguments')
+        .insert({
+          debate_id: id,
+          user_id: sessionData.session.user.id,
+          position: position,
+          content: argument
+        });
+        
+      if (error) {
+        console.error("Error submitting argument:", error);
+        toast.error("Failed to submit argument", {
+          description: error.message
+        });
+        return;
+      }
+      
+      toast.success("Argument submitted successfully!");
+      
+      // Reset form and refresh arguments
+      setArgument("");
+      
+      // Update argument count in debate
+      if (debate) {
+        const newCount = (debate.argument_count || 0) + 1;
+        await supabase
+          .from('debates')
+          .update({ argument_count: newCount })
+          .eq('id', id);
+      }
+      
+    } catch (error) {
+      console.error("Error submitting argument:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (!debate) {
+  if (isDebateLoading || isCreatorLoading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-elitePurple" />
+      </div>
+    );
+  }
+
+  if (debateError || !debate) {
     return <div className="text-center py-12">Debate not found</div>;
   }
 
@@ -81,18 +213,20 @@ const DebateDetailPage = () => {
         <div className="flex items-center justify-between border-t border-b py-3 text-sm">
           <div className="flex items-center">
             <div className="bg-elitePurple text-white rounded-full h-6 w-6 flex items-center justify-center mr-2">
-              {creator?.fullName.charAt(0)}
+              {creator?.full_name?.charAt(0) || creator?.username?.charAt(0) || '?'}
             </div>
-            <span className="text-eliteDarkGray">Started by <span className="font-medium">{creator?.username}</span></span>
+            <span className="text-eliteDarkGray">
+              Started by <span className="font-medium">{creator?.username || 'Unknown'}</span>
+            </span>
           </div>
           <div className="flex space-x-4">
             <div className="flex items-center">
               <MessageSquare className="h-4 w-4 mr-1 text-eliteMediumGray" />
-              <span>{debate.argumentCount} arguments</span>
+              <span>{debate.argument_count || 0} arguments</span>
             </div>
             <div className="flex items-center">
               <Users className="h-4 w-4 mr-1 text-eliteMediumGray" />
-              <span>{debate.participantCount} participants</span>
+              <span>{debate.participant_count || 0} participants</span>
             </div>
           </div>
         </div>
@@ -106,11 +240,32 @@ const DebateDetailPage = () => {
               Arguments For ({forArguments.length})
             </h3>
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-              {forArguments.map(argument => (
-                <ArgumentCard key={argument.id} argument={argument} />
-              ))}
-              {forArguments.length === 0 && (
+              {areArgumentsLoading ? (
+                <div className="flex justify-center items-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-elitePurple" />
+                </div>
+              ) : forArguments.length === 0 ? (
                 <p className="text-sm text-eliteMediumGray">No arguments for this position yet.</p>
+              ) : (
+                forArguments.map(argument => (
+                  <ArgumentCard 
+                    key={argument.id} 
+                    argument={{
+                      id: argument.id,
+                      debateId: argument.debate_id,
+                      userId: argument.user_id,
+                      position: argument.position as 'for' | 'against',
+                      content: argument.content,
+                      createdAt: new Date(argument.created_at || ''),
+                      updatedAt: new Date(argument.updated_at || ''),
+                      votes: argument.votes,
+                      user: {
+                        username: argument.profiles?.username || 'Unknown',
+                        avatarUrl: argument.profiles?.avatar_url || undefined
+                      }
+                    }} 
+                  />
+                ))
               )}
             </div>
           </CardContent>
@@ -123,11 +278,32 @@ const DebateDetailPage = () => {
               Arguments Against ({againstArguments.length})
             </h3>
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-              {againstArguments.map(argument => (
-                <ArgumentCard key={argument.id} argument={argument} />
-              ))}
-              {againstArguments.length === 0 && (
+              {areArgumentsLoading ? (
+                <div className="flex justify-center items-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-elitePurple" />
+                </div>
+              ) : againstArguments.length === 0 ? (
                 <p className="text-sm text-eliteMediumGray">No arguments against this position yet.</p>
+              ) : (
+                againstArguments.map(argument => (
+                  <ArgumentCard 
+                    key={argument.id} 
+                    argument={{
+                      id: argument.id,
+                      debateId: argument.debate_id,
+                      userId: argument.user_id,
+                      position: argument.position as 'for' | 'against',
+                      content: argument.content,
+                      createdAt: new Date(argument.created_at || ''),
+                      updatedAt: new Date(argument.updated_at || ''),
+                      votes: argument.votes,
+                      user: {
+                        username: argument.profiles?.username || 'Unknown',
+                        avatarUrl: argument.profiles?.avatar_url || undefined
+                      }
+                    }} 
+                  />
+                ))
               )}
             </div>
           </CardContent>
@@ -159,8 +335,12 @@ const DebateDetailPage = () => {
             />
           </div>
           
-          <Button type="submit" className="bg-elitePurple hover:bg-elitePurple/90 text-white">
-            Submit Argument
+          <Button 
+            type="submit" 
+            className="bg-elitePurple hover:bg-elitePurple/90 text-white"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Submitting..." : "Submit Argument"}
           </Button>
         </form>
       </div>

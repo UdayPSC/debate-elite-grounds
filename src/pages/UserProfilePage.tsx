@@ -1,25 +1,69 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { getUserByUsername, getUserDebates } from "@/data/mockData";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import DebateCard from "@/components/debates/DebateCard";
 import { Calendar, MessageSquare, Map, Trophy } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { Database } from "@/integrations/supabase/types";
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type Debate = Database['public']['Tables']['debates']['Row'];
 
 const UserProfilePage = () => {
   const { username } = useParams<{ username: string }>();
+  const [userDebates, setUserDebates] = useState<Debate[]>([]);
   
-  // In a real app, we would fetch the user profile from API
-  const user = username ? getUserByUsername(username) : undefined;
-  const userDebates = user ? getUserDebates(user.id) : [];
+  // Fetch user profile from Supabase
+  const { data: profile, isLoading: isProfileLoading, error: profileError } = useQuery({
+    queryKey: ['profile', username],
+    queryFn: async () => {
+      if (!username) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('username', username)
+        .maybeSingle();
+        
+      if (error) throw error;
+      return data as Profile | null;
+    }
+  });
   
-  if (!user) {
+  // Fetch user's debates once we have the profile
+  useEffect(() => {
+    const fetchUserDebates = async () => {
+      if (profile?.id) {
+        const { data, error } = await supabase
+          .from('debates')
+          .select('*')
+          .eq('created_by', profile.id)
+          .order('created_at', { ascending: false });
+          
+        if (!error && data) {
+          setUserDebates(data as Debate[]);
+        }
+      }
+    };
+    
+    fetchUserDebates();
+  }, [profile?.id]);
+  
+  if (isProfileLoading) {
+    return <div className="text-center py-12">Loading profile...</div>;
+  }
+  
+  if (profileError || !profile) {
     return <div className="text-center py-12">User not found</div>;
   }
 
-  const formatDate = (date: Date) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric'
@@ -33,21 +77,21 @@ const UserProfilePage = () => {
         <div className="px-6 pb-6 relative">
           <div className="flex flex-col md:flex-row md:items-end gap-4 -mt-12 mb-6">
             <div className="h-24 w-24 rounded-full bg-white p-1 shadow-md">
-              {user.avatarUrl ? (
+              {profile.avatar_url ? (
                 <img 
-                  src={user.avatarUrl} 
-                  alt={user.fullName} 
+                  src={profile.avatar_url} 
+                  alt={profile.full_name || profile.username} 
                   className="h-full w-full object-cover rounded-full"
                 />
               ) : (
                 <div className="h-full w-full bg-elitePurple rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {user.fullName.charAt(0)}
+                  {(profile.full_name || profile.username).charAt(0)}
                 </div>
               )}
             </div>
             <div className="md:flex-1">
-              <h1 className="text-2xl font-bold text-eliteNavy">{user.fullName}</h1>
-              <p className="text-eliteMediumGray">@{user.username}</p>
+              <h1 className="text-2xl font-bold text-eliteNavy">{profile.full_name || ''}</h1>
+              <p className="text-eliteMediumGray">@{profile.username}</p>
             </div>
             <Button variant="outline" className="border-elitePurple text-elitePurple hover:bg-eliteLightPurple">
               Follow
@@ -55,12 +99,12 @@ const UserProfilePage = () => {
           </div>
           
           <div className="space-y-4">
-            {user.bio && (
-              <p className="text-eliteDarkGray">{user.bio}</p>
+            {profile.bio && (
+              <p className="text-eliteDarkGray">{profile.bio}</p>
             )}
             
             <div className="flex flex-wrap gap-2">
-              {user.expertiseAreas?.map((area) => (
+              {profile.expertise_areas?.map((area) => (
                 <Badge key={area} variant="secondary" className="bg-eliteLightPurple text-eliteNavy">
                   {area}
                 </Badge>
@@ -68,15 +112,15 @@ const UserProfilePage = () => {
             </div>
             
             <div className="flex flex-wrap gap-y-2 gap-x-6 text-sm text-eliteMediumGray">
-              {user.location && (
+              {profile.location && (
                 <div className="flex items-center">
                   <Map className="h-4 w-4 mr-1" />
-                  <span>{user.location}</span>
+                  <span>{profile.location}</span>
                 </div>
               )}
               <div className="flex items-center">
                 <Calendar className="h-4 w-4 mr-1" />
-                <span>Joined {formatDate(user.createdAt)}</span>
+                <span>Joined {formatDate(profile.created_at)}</span>
               </div>
               <div className="flex items-center">
                 <MessageSquare className="h-4 w-4 mr-1" />
@@ -108,7 +152,22 @@ const UserProfilePage = () => {
           {userDebates.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {userDebates.map(debate => (
-                <DebateCard key={debate.id} debate={debate} />
+                <DebateCard 
+                  key={debate.id} 
+                  debate={{
+                    id: debate.id,
+                    title: debate.title,
+                    description: debate.description,
+                    category: debate.category,
+                    createdBy: debate.created_by,
+                    createdAt: new Date(debate.created_at || ''),
+                    endsAt: new Date(debate.ends_at),
+                    status: debate.status as 'active' | 'completed',
+                    participantCount: debate.participant_count || 0,
+                    argumentCount: debate.argument_count || 0,
+                    featured: debate.featured || false
+                  }} 
+                />
               ))}
             </div>
           ) : (
