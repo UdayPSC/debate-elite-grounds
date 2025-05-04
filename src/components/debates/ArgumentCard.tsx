@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
 
 interface ArgumentUser {
   username: string;
@@ -21,14 +23,15 @@ export interface Argument {
   votes: {
     upvotes: number;
     downvotes: number;
+    userVote?: 'up' | 'down' | null;
   };
   user: ArgumentUser;
 }
 
 interface ArgumentCardProps {
   argument: Argument;
-  onUpvote?: () => void;
-  onDownvote?: () => void;
+  onUpvote?: (argumentId: string) => void;
+  onDownvote?: (argumentId: string) => void;
 }
 
 const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, onUpvote, onDownvote }) => {
@@ -41,6 +44,44 @@ const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, onUpvote, onDownv
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const handleUpvote = async () => {
+    try {
+      // Check if user is logged in
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (!sessionData.session) {
+        toast.error("You must be logged in to vote");
+        return;
+      }
+
+      if (onUpvote) {
+        onUpvote(argument.id);
+      }
+    } catch (error) {
+      console.error("Error upvoting:", error);
+      toast.error("Failed to upvote");
+    }
+  };
+
+  const handleDownvote = async () => {
+    try {
+      // Check if user is logged in
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (!sessionData.session) {
+        toast.error("You must be logged in to vote");
+        return;
+      }
+
+      if (onDownvote) {
+        onDownvote(argument.id);
+      }
+    } catch (error) {
+      console.error("Error downvoting:", error);
+      toast.error("Failed to downvote");
+    }
   };
 
   return (
@@ -74,16 +115,22 @@ const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, onUpvote, onDownv
           <Button
             variant="ghost"
             size="sm"
-            className="text-eliteMediumGray hover:text-green-600 hover:bg-green-50 flex items-center text-xs"
-            onClick={onUpvote}
+            className={cn(
+              "text-eliteMediumGray hover:text-green-600 hover:bg-green-50 flex items-center text-xs",
+              argument.votes.userVote === 'up' && "text-green-600 bg-green-50"
+            )}
+            onClick={handleUpvote}
           >
             <ThumbsUp className="h-3 w-3 mr-1" /> {argument.votes.upvotes}
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            className="text-eliteMediumGray hover:text-red-600 hover:bg-red-50 flex items-center text-xs"
-            onClick={onDownvote}
+            className={cn(
+              "text-eliteMediumGray hover:text-red-600 hover:bg-red-50 flex items-center text-xs",
+              argument.votes.userVote === 'down' && "text-red-600 bg-red-50"
+            )}
+            onClick={handleDownvote}
           >
             <ThumbsDown className="h-3 w-3 mr-1" /> {argument.votes.downvotes}
           </Button>

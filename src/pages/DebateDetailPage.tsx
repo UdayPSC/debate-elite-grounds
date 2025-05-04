@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import ArgumentCard from "@/components/debates/ArgumentCard";
+import ArgumentCard, { Argument } from "@/components/debates/ArgumentCard";
 import { MessageSquare, Users, Clock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,12 +15,8 @@ import { Database } from "@/integrations/supabase/types";
 
 type Debate = Database['public']['Tables']['debates']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type ArgumentType = Database['public']['Tables']['arguments']['Row'];
-
-// Define a more specific type for the processed arguments that includes all needed properties
-type ProcessedArgument = ArgumentType & {
+type ArgumentRow = Database['public']['Tables']['arguments']['Row'] & {
   profiles: Profile;
-  votes: { upvotes: number; downvotes: number };
 };
 
 const DebateDetailPage = () => {
@@ -30,6 +26,7 @@ const DebateDetailPage = () => {
   const [position, setPosition] = useState<"for" | "against">("for");
   const [argument, setArgument] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentUserVotes, setCurrentUserVotes] = useState<Record<string, 'up' | 'down' | null>>({});
   
   // Fetch debate details
   const { data: debate, isLoading: isDebateLoading, error: debateError } = useQuery({
@@ -67,8 +64,8 @@ const DebateDetailPage = () => {
     enabled: !!debate?.created_by
   });
   
-  // Fetch debate arguments
-  const { data: debateArguments, isLoading: areArgumentsLoading } = useQuery({
+  // Fetch arguments
+  const { data: argumentRows, isLoading: areArgumentsLoading } = useQuery({
     queryKey: ['debateArguments', id],
     queryFn: async () => {
       if (!id) return [];
@@ -77,64 +74,128 @@ const DebateDetailPage = () => {
         .from('arguments')
         .select(`
           *,
-          profiles:user_id(*)
+          profiles: user_id (*)
         `)
         .eq('debate_id', id)
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      
-      // Process arguments to include vote counts
-      const result = (data || []).map(arg => {
-        // Handle the case where profiles could be null
-        const profileData = arg.profiles || { username: 'Unknown', avatar_url: null };
-        
-        return {
-          ...arg,
-          profiles: profileData as Profile,
-          votes: { upvotes: 0, downvotes: 0 } // Placeholder for actual vote counts
-        };
-      });
-      
-      return result as ProcessedArgument[];
+      return data as ArgumentRow[];
     },
     enabled: !!id
+  });
+
+  // Fetch votes for the arguments
+  const { data: votes } = useQuery({
+    queryKey: ['argumentVotes', id],
+    queryFn: async () => {
+      if (!id) return [];
+      
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      
+      const { data, error } = await supabase
+        .from('votes')
+        .select('*')
+        .eq('argument_id', argumentRows?.map(arg => arg.id) || []);
+        
+      if (error) throw error;
+      
+      // Process votes
+      const voteCounts: Record<string, { upvotes: number, downvotes: number }> = {};
+      const userVotes: Record<string, 'up' | 'down' | null> = {};
+      
+      data?.forEach(vote => {
+        if (!voteCounts[vote.argument_id]) {
+          voteCounts[vote.argument_id] = { upvotes: 0, downvotes: 0 };
+        }
+        
+        if (vote.vote_type) {
+          voteCounts[vote.argument_id].upvotes += 1;
+        } else {
+          voteCounts[vote.argument_id].downvotes += 1;
+        }
+        
+        // Track user's own votes
+        if (userId && vote.user_id === userId) {
+          userVotes[vote.argument_id] = vote.vote_type ? 'up' : 'down';
+        }
+      });
+      
+      setCurrentUserVotes(userVotes);
+      return voteCounts;
+    },
+    enabled: !!argumentRows?.length
   });
   
   // Set up real-time subscription for new arguments
   useEffect(() => {
     if (!id) return;
-
+    
     const channel = supabase
-      .channel('public:arguments')
-      .on('postgres_changes', 
-        {
+      .channel('argument-changes')
+      .on(
+        'postgres_changes',
+        { 
           event: '*', 
-          schema: 'public', 
+          schema: 'public',
           table: 'arguments',
           filter: `debate_id=eq.${id}`
-        }, 
+        },
         () => {
-          // When any change happens to arguments, invalidate the query to trigger a refetch
-          queryClient.invalidateQueries({
-            queryKey: ['debateArguments', id]
-          });
+          // Invalidate and refetch arguments when changes happen
+          queryClient.invalidateQueries({ queryKey: ['debateArguments', id] });
           
-          // Also update the debate to reflect new argument count
-          queryClient.invalidateQueries({
-            queryKey: ['debate', id]
-          });
+          // Also update debate's argument count on insert
+          queryClient.invalidateQueries({ queryKey: ['debate', id] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'votes',
+          filter: `argument_id=in.(${argumentRows?.map(arg => arg.id).join(',') || ''})`
+        },
+        () => {
+          // Invalidate and refetch votes when changes happen
+          queryClient.invalidateQueries({ queryKey: ['argumentVotes', id] });
         }
       )
       .subscribe();
-
+      
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, queryClient]);
-
-  const forArguments = debateArguments?.filter(arg => arg.position === "for") || [];
-  const againstArguments = debateArguments?.filter(arg => arg.position === "against") || [];
+  }, [id, queryClient, argumentRows]);
+  
+  // Transform raw data into the format expected by ArgumentCard component
+  const processedArguments: Argument[] = (argumentRows || []).map(argRow => {
+    const voteInfo = votes?.[argRow.id] || { upvotes: 0, downvotes: 0 };
+    
+    return {
+      id: argRow.id,
+      debateId: argRow.debate_id,
+      userId: argRow.user_id,
+      position: argRow.position as 'for' | 'against',
+      content: argRow.content,
+      createdAt: new Date(argRow.created_at || ''),
+      updatedAt: new Date(argRow.updated_at || ''),
+      votes: {
+        upvotes: voteInfo.upvotes,
+        downvotes: voteInfo.downvotes,
+        userVote: currentUserVotes[argRow.id] || null
+      },
+      user: {
+        username: argRow.profiles?.username || 'Unknown',
+        avatarUrl: argRow.profiles?.avatar_url || undefined
+      }
+    };
+  });
+  
+  const forArguments = processedArguments.filter(arg => arg.position === "for");
+  const againstArguments = processedArguments.filter(arg => arg.position === "against");
   
   const timeRemaining = () => {
     if (!debate?.ends_at) return "";
@@ -153,6 +214,78 @@ const DebateDetailPage = () => {
       return `${days} day${days > 1 ? 's' : ''} remaining`;
     } else {
       return `${hours} hour${hours > 1 ? 's' : ''} remaining`;
+    }
+  };
+  
+  const handleVote = async (argumentId: string, voteType: boolean) => {
+    // Check if user is logged in
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    if (!sessionData.session) {
+      toast.error("You must be logged in to vote", {
+        description: "Please log in and try again."
+      });
+      navigate("/login");
+      return;
+    }
+    
+    const userId = sessionData.session.user.id;
+    
+    // Check if user already voted
+    const currentVote = currentUserVotes[argumentId];
+    
+    try {
+      // If user already voted the same way, remove the vote
+      if ((currentVote === 'up' && voteType) || (currentVote === 'down' && !voteType)) {
+        // Delete the vote
+        const { error } = await supabase
+          .from('votes')
+          .delete()
+          .eq('user_id', userId)
+          .eq('argument_id', argumentId);
+        
+        if (error) throw error;
+        
+        // Update local state
+        setCurrentUserVotes(prev => ({
+          ...prev,
+          [argumentId]: null
+        }));
+      } else {
+        // If user already voted differently, update the vote
+        if (currentVote) {
+          const { error } = await supabase
+            .from('votes')
+            .update({ vote_type: voteType })
+            .eq('user_id', userId)
+            .eq('argument_id', argumentId);
+          
+          if (error) throw error;
+        } else {
+          // If user hasn't voted, insert new vote
+          const { error } = await supabase
+            .from('votes')
+            .insert({
+              user_id: userId,
+              argument_id: argumentId,
+              vote_type: voteType
+            });
+          
+          if (error) throw error;
+        }
+        
+        // Update local state
+        setCurrentUserVotes(prev => ({
+          ...prev,
+          [argumentId]: voteType ? 'up' : 'down'
+        }));
+      }
+      
+      // Invalidate votes query to trigger refetch
+      queryClient.invalidateQueries({ queryKey: ['argumentVotes', id] });
+    } catch (error) {
+      console.error('Error voting:', error);
+      toast.error("Failed to submit vote");
     }
   };
   
@@ -216,53 +349,6 @@ const DebateDetailPage = () => {
       toast.error("An unexpected error occurred");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleVote = async (argumentId: string, voteType: 'upvote' | 'downvote') => {
-    // Check if user is logged in
-    const { data: sessionData } = await supabase.auth.getSession();
-    
-    if (!sessionData.session) {
-      toast.error("You must be logged in to vote", {
-        description: "Please log in and try again."
-      });
-      navigate("/login");
-      return;
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('votes')
-        .insert({
-          argument_id: argumentId,
-          user_id: sessionData.session.user.id,
-          vote_type: voteType === 'upvote' ? true : false
-        });
-        
-      if (error) {
-        if (error.code === '23505') { // Unique violation
-          toast.error("You've already voted on this argument", {
-            description: "You can only vote once per argument."
-          });
-        } else {
-          toast.error("Failed to register vote", {
-            description: error.message
-          });
-        }
-        return;
-      }
-      
-      toast.success(`${voteType === 'upvote' ? 'Upvoted' : 'Downvoted'} successfully!`);
-      
-      // Invalidate the arguments query to refresh the vote counts
-      queryClient.invalidateQueries({
-        queryKey: ['debateArguments', id]
-      });
-      
-    } catch (error) {
-      console.error("Error voting:", error);
-      toast.error("An unexpected error occurred");
     }
   };
 
@@ -337,25 +423,12 @@ const DebateDetailPage = () => {
               ) : forArguments.length === 0 ? (
                 <p className="text-sm text-eliteMediumGray">No arguments for this position yet.</p>
               ) : (
-                forArguments.map(arg => (
+                forArguments.map(argument => (
                   <ArgumentCard 
-                    key={arg.id} 
-                    argument={{
-                      id: arg.id,
-                      debateId: arg.debate_id,
-                      userId: arg.user_id,
-                      position: arg.position as 'for' | 'against',
-                      content: arg.content,
-                      createdAt: new Date(arg.created_at || ''),
-                      updatedAt: new Date(arg.updated_at || ''),
-                      votes: arg.votes,
-                      user: {
-                        username: arg.profiles?.username || 'Unknown',
-                        avatarUrl: arg.profiles?.avatar_url || undefined
-                      }
-                    }}
-                    onUpvote={() => handleVote(arg.id, 'upvote')}
-                    onDownvote={() => handleVote(arg.id, 'downvote')}
+                    key={argument.id} 
+                    argument={argument}
+                    onUpvote={() => handleVote(argument.id, true)}
+                    onDownvote={() => handleVote(argument.id, false)}
                   />
                 ))
               )}
@@ -377,25 +450,12 @@ const DebateDetailPage = () => {
               ) : againstArguments.length === 0 ? (
                 <p className="text-sm text-eliteMediumGray">No arguments against this position yet.</p>
               ) : (
-                againstArguments.map(arg => (
+                againstArguments.map(argument => (
                   <ArgumentCard 
-                    key={arg.id} 
-                    argument={{
-                      id: arg.id,
-                      debateId: arg.debate_id,
-                      userId: arg.user_id,
-                      position: arg.position as 'for' | 'against',
-                      content: arg.content,
-                      createdAt: new Date(arg.created_at || ''),
-                      updatedAt: new Date(arg.updated_at || ''),
-                      votes: arg.votes,
-                      user: {
-                        username: arg.profiles?.username || 'Unknown',
-                        avatarUrl: arg.profiles?.avatar_url || undefined
-                      }
-                    }}
-                    onUpvote={() => handleVote(arg.id, 'upvote')}
-                    onDownvote={() => handleVote(arg.id, 'downvote')}
+                    key={argument.id} 
+                    argument={argument}
+                    onUpvote={() => handleVote(argument.id, true)}
+                    onDownvote={() => handleVote(argument.id, false)}
                   />
                 ))
               )}
