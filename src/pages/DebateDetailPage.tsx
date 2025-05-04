@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import ArgumentCard, { Argument } from "@/components/debates/ArgumentCard";
-import { MessageSquare, Users, Clock, Loader2 } from "lucide-react";
+import { MessageSquare, Users, Clock, Loader2, Reply } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
@@ -27,6 +27,7 @@ const DebateDetailPage = () => {
   const [argument, setArgument] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUserVotes, setCurrentUserVotes] = useState<Record<string, 'up' | 'down' | null>>({});
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
   
   // Fetch debate details
   const { data: debate, isLoading: isDebateLoading, error: debateError } = useQuery({
@@ -291,6 +292,12 @@ const DebateDetailPage = () => {
     }
   };
   
+  const handleReply = (argumentId: string) => {
+    setReplyingTo(argumentId);
+    // Scroll to argument form
+    document.getElementById('argument-form')?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
   const handleSubmitArgument = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -336,6 +343,7 @@ const DebateDetailPage = () => {
       
       // Reset form
       setArgument("");
+      setReplyingTo(null);
       
       // Update argument count in debate
       if (debate) {
@@ -431,6 +439,7 @@ const DebateDetailPage = () => {
                     argument={argument}
                     onUpvote={() => handleVote(argument.id, true)}
                     onDownvote={() => handleVote(argument.id, false)}
+                    onReply={() => handleReply(argument.id)}
                   />
                 ))
               )}
@@ -458,6 +467,7 @@ const DebateDetailPage = () => {
                     argument={argument}
                     onUpvote={() => handleVote(argument.id, true)}
                     onDownvote={() => handleVote(argument.id, false)}
+                    onReply={() => handleReply(argument.id)}
                   />
                 ))
               )}
@@ -466,8 +476,20 @@ const DebateDetailPage = () => {
         </Card>
       </div>
       
-      <div className="bg-white p-6 border rounded-lg shadow-sm animate-scale-in">
-        <h3 className="font-semibold text-lg mb-4">Add Your Argument</h3>
+      <div id="argument-form" className="bg-white p-6 border rounded-lg shadow-sm animate-scale-in">
+        <h3 className="font-semibold text-lg mb-4">
+          {replyingTo ? 'Reply to Argument' : 'Add Your Argument'}
+          {replyingTo && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 text-eliteMediumGray"
+              onClick={() => setReplyingTo(null)}
+            >
+              (Cancel)
+            </Button>
+          )}
+        </h3>
         <form onSubmit={handleSubmitArgument}>
           <div className="mb-4">
             <label className="text-sm font-medium mb-2 block">Your Position</label>

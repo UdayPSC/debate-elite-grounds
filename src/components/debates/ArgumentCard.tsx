@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Reply } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,9 +32,10 @@ interface ArgumentCardProps {
   argument: Argument;
   onUpvote?: (argumentId: string) => void;
   onDownvote?: (argumentId: string) => void;
+  onReply?: (argumentId: string) => void;
 }
 
-const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, onUpvote, onDownvote }) => {
+const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, onUpvote, onDownvote, onReply }) => {
   const formatDate = (date: Date) => {
     if (!date || isNaN(date.getTime())) {
       return 'Unknown date';
@@ -81,6 +82,25 @@ const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, onUpvote, onDownv
     } catch (error) {
       console.error("Error downvoting:", error);
       toast.error("Failed to downvote");
+    }
+  };
+
+  const handleReply = async () => {
+    try {
+      // Check if user is logged in
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (!sessionData.session) {
+        toast.error("You must be logged in to reply");
+        return;
+      }
+
+      if (onReply) {
+        onReply(argument.id);
+      }
+    } catch (error) {
+      console.error("Error setting up reply:", error);
+      toast.error("Failed to set up reply");
     }
   };
 
@@ -133,6 +153,14 @@ const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, onUpvote, onDownv
             onClick={handleDownvote}
           >
             <ThumbsDown className="h-3 w-3 mr-1" /> {argument.votes.downvotes}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-eliteMediumGray hover:text-elitePurple hover:bg-eliteLightPurple flex items-center text-xs"
+            onClick={handleReply}
+          >
+            <Reply className="h-3 w-3 mr-1" /> Reply
           </Button>
         </div>
       </CardContent>
