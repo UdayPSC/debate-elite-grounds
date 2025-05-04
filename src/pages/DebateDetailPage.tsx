@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,13 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import ArgumentCard from "@/components/debates/ArgumentCard";
 import { MessageSquare, Users, Clock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import { Database } from "@/integrations/supabase/types";
 
 type Debate = Database['public']['Tables']['debates']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type Argument = Database['public']['Tables']['arguments']['Row'] & {
+type ArgumentType = Database['public']['Tables']['arguments']['Row'];
+
+// Define a more specific type for the processed arguments that includes all needed properties
+type ProcessedArgument = ArgumentType & {
   profiles: Profile;
   votes: { upvotes: number; downvotes: number };
 };
@@ -23,6 +26,7 @@ type Argument = Database['public']['Tables']['arguments']['Row'] & {
 const DebateDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [position, setPosition] = useState<"for" | "against">("for");
   const [argument, setArgument] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,7 +67,7 @@ const DebateDetailPage = () => {
     enabled: !!debate?.created_by
   });
   
-  // Fetch arguments - renamed from 'arguments' to 'debateArguments' to avoid using reserved word
+  // Fetch debate arguments
   const { data: debateArguments, isLoading: areArgumentsLoading } = useQuery({
     queryKey: ['debateArguments', id],
     queryFn: async () => {
@@ -82,10 +86,8 @@ const DebateDetailPage = () => {
       
       // Process arguments to include vote counts
       const result = (data || []).map(arg => {
-        // Handle the case where profiles could be an error or a valid profile
-        const profileData = typeof arg.profiles === 'object' && arg.profiles !== null 
-          ? arg.profiles 
-          : { username: 'Unknown', avatar_url: null };
+        // Handle the case where profiles could be null
+        const profileData = arg.profiles || { username: 'Unknown', avatar_url: null };
         
         return {
           ...arg,
@@ -94,11 +96,43 @@ const DebateDetailPage = () => {
         };
       });
       
-      return result as unknown as Argument[];
+      return result as ProcessedArgument[];
     },
     enabled: !!id
   });
   
+  // Set up real-time subscription for new arguments
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel('public:arguments')
+      .on('postgres_changes', 
+        {
+          event: '*', 
+          schema: 'public', 
+          table: 'arguments',
+          filter: `debate_id=eq.${id}`
+        }, 
+        () => {
+          // When any change happens to arguments, invalidate the query to trigger a refetch
+          queryClient.invalidateQueries({
+            queryKey: ['debateArguments', id]
+          });
+          
+          // Also update the debate to reflect new argument count
+          queryClient.invalidateQueries({
+            queryKey: ['debate', id]
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, queryClient]);
+
   const forArguments = debateArguments?.filter(arg => arg.position === "for") || [];
   const againstArguments = debateArguments?.filter(arg => arg.position === "against") || [];
   
@@ -165,7 +199,7 @@ const DebateDetailPage = () => {
       
       toast.success("Argument submitted successfully!");
       
-      // Reset form and refresh arguments
+      // Reset form
       setArgument("");
       
       // Update argument count in debate
@@ -182,6 +216,53 @@ const DebateDetailPage = () => {
       toast.error("An unexpected error occurred");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleVote = async (argumentId: string, voteType: 'upvote' | 'downvote') => {
+    // Check if user is logged in
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    if (!sessionData.session) {
+      toast.error("You must be logged in to vote", {
+        description: "Please log in and try again."
+      });
+      navigate("/login");
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('votes')
+        .insert({
+          argument_id: argumentId,
+          user_id: sessionData.session.user.id,
+          vote_type: voteType === 'upvote' ? true : false
+        });
+        
+      if (error) {
+        if (error.code === '23505') { // Unique violation
+          toast.error("You've already voted on this argument", {
+            description: "You can only vote once per argument."
+          });
+        } else {
+          toast.error("Failed to register vote", {
+            description: error.message
+          });
+        }
+        return;
+      }
+      
+      toast.success(`${voteType === 'upvote' ? 'Upvoted' : 'Downvoted'} successfully!`);
+      
+      // Invalidate the arguments query to refresh the vote counts
+      queryClient.invalidateQueries({
+        queryKey: ['debateArguments', id]
+      });
+      
+    } catch (error) {
+      console.error("Error voting:", error);
+      toast.error("An unexpected error occurred");
     }
   };
 
@@ -272,7 +353,9 @@ const DebateDetailPage = () => {
                         username: arg.profiles?.username || 'Unknown',
                         avatarUrl: arg.profiles?.avatar_url || undefined
                       }
-                    }} 
+                    }}
+                    onUpvote={() => handleVote(arg.id, 'upvote')}
+                    onDownvote={() => handleVote(arg.id, 'downvote')}
                   />
                 ))
               )}
@@ -310,7 +393,9 @@ const DebateDetailPage = () => {
                         username: arg.profiles?.username || 'Unknown',
                         avatarUrl: arg.profiles?.avatar_url || undefined
                       }
-                    }} 
+                    }}
+                    onUpvote={() => handleVote(arg.id, 'upvote')}
+                    onDownvote={() => handleVote(arg.id, 'downvote')}
                   />
                 ))
               )}
