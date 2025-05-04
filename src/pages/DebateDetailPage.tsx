@@ -63,8 +63,8 @@ const DebateDetailPage = () => {
     enabled: !!debate?.created_by
   });
   
-  // Fetch arguments
-  const { data: arguments, isLoading: areArgumentsLoading } = useQuery({
+  // Fetch arguments - renamed from 'arguments' to 'debateArguments' to avoid using reserved word
+  const { data: debateArguments, isLoading: areArgumentsLoading } = useQuery({
     queryKey: ['debateArguments', id],
     queryFn: async () => {
       if (!id) return [];
@@ -73,7 +73,7 @@ const DebateDetailPage = () => {
         .from('arguments')
         .select(`
           *,
-          profiles: user_id (*)
+          profiles:user_id(*)
         `)
         .eq('debate_id', id)
         .order('created_at', { ascending: false });
@@ -81,17 +81,26 @@ const DebateDetailPage = () => {
       if (error) throw error;
       
       // Process arguments to include vote counts
-      // In a real app, we would fetch actual votes from the database
-      return (data || []).map(arg => ({
-        ...arg,
-        votes: { upvotes: 0, downvotes: 0 } // Placeholder for actual vote counts
-      })) as Argument[];
+      const result = (data || []).map(arg => {
+        // Handle the case where profiles could be an error or a valid profile
+        const profileData = typeof arg.profiles === 'object' && arg.profiles !== null 
+          ? arg.profiles 
+          : { username: 'Unknown', avatar_url: null };
+        
+        return {
+          ...arg,
+          profiles: profileData as Profile,
+          votes: { upvotes: 0, downvotes: 0 } // Placeholder for actual vote counts
+        };
+      });
+      
+      return result as unknown as Argument[];
     },
     enabled: !!id
   });
   
-  const forArguments = arguments?.filter(arg => arg.position === "for") || [];
-  const againstArguments = arguments?.filter(arg => arg.position === "against") || [];
+  const forArguments = debateArguments?.filter(arg => arg.position === "for") || [];
+  const againstArguments = debateArguments?.filter(arg => arg.position === "against") || [];
   
   const timeRemaining = () => {
     if (!debate?.ends_at) return "";
@@ -247,21 +256,21 @@ const DebateDetailPage = () => {
               ) : forArguments.length === 0 ? (
                 <p className="text-sm text-eliteMediumGray">No arguments for this position yet.</p>
               ) : (
-                forArguments.map(argument => (
+                forArguments.map(arg => (
                   <ArgumentCard 
-                    key={argument.id} 
+                    key={arg.id} 
                     argument={{
-                      id: argument.id,
-                      debateId: argument.debate_id,
-                      userId: argument.user_id,
-                      position: argument.position as 'for' | 'against',
-                      content: argument.content,
-                      createdAt: new Date(argument.created_at || ''),
-                      updatedAt: new Date(argument.updated_at || ''),
-                      votes: argument.votes,
+                      id: arg.id,
+                      debateId: arg.debate_id,
+                      userId: arg.user_id,
+                      position: arg.position as 'for' | 'against',
+                      content: arg.content,
+                      createdAt: new Date(arg.created_at || ''),
+                      updatedAt: new Date(arg.updated_at || ''),
+                      votes: arg.votes,
                       user: {
-                        username: argument.profiles?.username || 'Unknown',
-                        avatarUrl: argument.profiles?.avatar_url || undefined
+                        username: arg.profiles?.username || 'Unknown',
+                        avatarUrl: arg.profiles?.avatar_url || undefined
                       }
                     }} 
                   />
@@ -285,21 +294,21 @@ const DebateDetailPage = () => {
               ) : againstArguments.length === 0 ? (
                 <p className="text-sm text-eliteMediumGray">No arguments against this position yet.</p>
               ) : (
-                againstArguments.map(argument => (
+                againstArguments.map(arg => (
                   <ArgumentCard 
-                    key={argument.id} 
+                    key={arg.id} 
                     argument={{
-                      id: argument.id,
-                      debateId: argument.debate_id,
-                      userId: argument.user_id,
-                      position: argument.position as 'for' | 'against',
-                      content: argument.content,
-                      createdAt: new Date(argument.created_at || ''),
-                      updatedAt: new Date(argument.updated_at || ''),
-                      votes: argument.votes,
+                      id: arg.id,
+                      debateId: arg.debate_id,
+                      userId: arg.user_id,
+                      position: arg.position as 'for' | 'against',
+                      content: arg.content,
+                      createdAt: new Date(arg.created_at || ''),
+                      updatedAt: new Date(arg.updated_at || ''),
+                      votes: arg.votes,
                       user: {
-                        username: argument.profiles?.username || 'Unknown',
-                        avatarUrl: argument.profiles?.avatar_url || undefined
+                        username: arg.profiles?.username || 'Unknown',
+                        avatarUrl: arg.profiles?.avatar_url || undefined
                       }
                     }} 
                   />
