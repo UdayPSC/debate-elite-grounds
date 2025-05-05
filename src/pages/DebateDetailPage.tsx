@@ -115,14 +115,20 @@ const DebateDetailPage = () => {
           }, {} as Record<string, any>);
           
           // Add profile data to each argument
-          argData.forEach(arg => {
-            arg.user = profileMap[arg.user_id] || { username: "Unknown User" };
-          });
+          const argDataWithProfiles = argData.map(arg => ({
+            ...arg,
+            user: profileMap[arg.user_id] || { username: "Unknown User" }
+          }));
+          
+          return argDataWithProfiles as ArgumentRow[];
         }
       }
       
-      console.log("Processed arguments:", argData);
-      return argData as ArgumentRow[];
+      // Return arguments without user data if profiles couldn't be fetched
+      return argData.map(arg => ({
+        ...arg,
+        user: { username: "Unknown User" }
+      })) as ArgumentRow[];
     },
     enabled: !!id
   });

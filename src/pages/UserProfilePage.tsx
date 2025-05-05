@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import DebateCard from "@/components/debates/DebateCard";
-import { Calendar, MessageSquare, Map, Trophy, Pencil, User, Settings } from "lucide-react";
+import ArgumentCard, { Argument } from "@/components/debates/ArgumentCard";
+import { Calendar, MessageSquare, Map, Trophy, Pencil, User, Settings, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
@@ -17,6 +17,19 @@ import { Database } from "@/integrations/supabase/types";
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type Debate = Database['public']['Tables']['debates']['Row'];
+
+interface ArgumentRow {
+  id: string;
+  debate_id: string;
+  user_id: string;
+  position: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  debate?: {
+    title?: string;
+  };
+}
 
 const UserProfilePage = () => {
   const { username } = useParams<{ username: string }>();
@@ -34,6 +47,7 @@ const UserProfilePage = () => {
     newExpertiseArea: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentUserVotes, setCurrentUserVotes] = useState<Record<string, 'up' | 'down' | null>>({});
   
   // Fetch current user
   const { data: currentUser } = useQuery({
@@ -113,6 +127,52 @@ const UserProfilePage = () => {
     
     fetchUserDebates();
   }, [profile?.id]);
+  
+  // Fetch user's arguments
+  const { data: userArguments, isLoading: isArgumentsLoading } = useQuery({
+    queryKey: ['userArguments', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      
+      // First get arguments
+      const { data: argumentsData, error: argumentsError } = await supabase
+        .from('arguments')
+        .select('*, debate:debate_id(title)')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
+        
+      if (argumentsError) {
+        console.error("Error fetching user arguments:", argumentsError);
+        throw argumentsError;
+      }
+
+      // Process arguments
+      const processedArguments: Argument[] = (argumentsData || []).map(arg => {
+        return {
+          id: arg.id,
+          debateId: arg.debate_id,
+          userId: arg.user_id,
+          position: arg.position as 'for' | 'against',
+          content: arg.content,
+          createdAt: new Date(arg.created_at || ''),
+          updatedAt: new Date(arg.updated_at || ''),
+          votes: {
+            upvotes: 0,
+            downvotes: 0,
+            userVote: null
+          },
+          user: {
+            username: profile.username || 'Unknown',
+            avatarUrl: profile.avatar_url || undefined
+          },
+          debateTitle: arg.debate?.title || 'Unknown Debate'
+        };
+      });
+      
+      return processedArguments;
+    },
+    enabled: !!profile?.id
+  });
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -343,10 +403,49 @@ const UserProfilePage = () => {
         </TabsContent>
         
         <TabsContent value="arguments" className="mt-6">
-          <div className="text-center py-12 bg-white rounded-lg border">
-            <MessageSquare className="mx-auto h-12 w-12 text-eliteMediumGray/30 mb-2" />
-            <p className="text-eliteMediumGray">User's arguments will be displayed here.</p>
-          </div>
+          {isArgumentsLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-elitePurple" />
+            </div>
+          ) : userArguments && userArguments.length > 0 ? (
+            <div className="space-y-4">
+              {userArguments.map(argument => (
+                <div key={argument.id} className="bg-white rounded-lg border p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-semibold text-sm text-eliteMediumGray">
+                      On debate: <span className="text-eliteNavy cursor-pointer hover:underline" onClick={() => navigate(`/debates/${argument.debateId}`)}>{argument.debateTitle}</span>
+                    </h4>
+                    <Badge variant="outline" className={argument.position === 'for' ? 'text-green-600 border-green-300 bg-green-50' : 'text-red-600 border-red-300 bg-red-50'}>
+                      {argument.position === 'for' ? 'For' : 'Against'}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-eliteDarkGray mb-2">{argument.content}</p>
+                  <div className="flex justify-between items-center">
+                    <div className="text-xs text-eliteMediumGray">
+                      {new Date(argument.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs text-elitePurple hover:bg-eliteLightPurple"
+                      onClick={() => navigate(`/debates/${argument.debateId}`)}
+                    >
+                      Go to Debate
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-white rounded-lg border">
+              <MessageSquare className="mx-auto h-12 w-12 text-eliteMediumGray/30 mb-2" />
+              <p className="text-eliteMediumGray">No arguments by this user yet.</p>
+            </div>
+          )}
         </TabsContent>
         
         <TabsContent value="achievements" className="mt-6">
