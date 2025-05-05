@@ -24,7 +24,10 @@ interface ArgumentRow {
   content: string;
   created_at: string;
   updated_at: string;
-  profiles: Profile;
+  user?: {
+    username?: string;
+    avatar_url?: string;
+  };
 }
 
 const DebateDetailPage = () => {
@@ -73,7 +76,7 @@ const DebateDetailPage = () => {
     enabled: !!debate?.created_by
   });
   
-  // Fetch arguments with proper join to profiles table
+  // Fetch arguments using a different approach
   const { data: argumentsData, isLoading: areArgumentsLoading } = useQuery({
     queryKey: ['debateArguments', id],
     queryFn: async () => {
@@ -81,22 +84,45 @@ const DebateDetailPage = () => {
       
       console.log("Fetching arguments for debate:", id);
       
-      const { data, error } = await supabase
+      // First get arguments
+      const { data: argData, error: argError } = await supabase
         .from('arguments')
-        .select(`
-          *,
-          profiles:user_id(*)
-        `)
+        .select('*')
         .eq('debate_id', id)
         .order('created_at', { ascending: false });
         
-      if (error) {
-        console.error("Error fetching arguments:", error);
-        throw error;
+      if (argError) {
+        console.error("Error fetching arguments:", argError);
+        throw argError;
       }
       
-      console.log("Fetched arguments:", data);
-      return data as unknown as ArgumentRow[];
+      // Then get user profiles separately
+      const userIds = [...new Set(argData.map(arg => arg.user_id))];
+      
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', userIds);
+          
+        if (profilesError) {
+          console.error("Error fetching profiles:", profilesError);
+        } else {
+          // Map profiles to arguments
+          const profileMap = profilesData.reduce((acc, profile) => {
+            acc[profile.id] = profile;
+            return acc;
+          }, {} as Record<string, any>);
+          
+          // Add profile data to each argument
+          argData.forEach(arg => {
+            arg.user = profileMap[arg.user_id] || { username: "Unknown User" };
+          });
+        }
+      }
+      
+      console.log("Processed arguments:", argData);
+      return argData as ArgumentRow[];
     },
     enabled: !!id
   });
@@ -209,8 +235,8 @@ const DebateDetailPage = () => {
         userVote: currentUserVotes[argRow.id] || null
       },
       user: {
-        username: argRow.profiles?.username || 'Unknown',
-        avatarUrl: argRow.profiles?.avatar_url || undefined
+        username: argRow.user?.username || 'Unknown',
+        avatarUrl: argRow.user?.avatar_url || undefined
       }
     };
   });
