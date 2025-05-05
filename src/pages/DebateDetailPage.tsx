@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import ArgumentCard, { Argument } from "@/components/debates/ArgumentCard";
-import { MessageSquare, Users, Clock, Loader2, Reply } from "lucide-react";
+import { MessageSquare, Users, Clock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
@@ -15,7 +15,14 @@ import { Database } from "@/integrations/supabase/types";
 
 type Debate = Database['public']['Tables']['debates']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type ArgumentRow = Database['public']['Tables']['arguments']['Row'] & {
+type ArgumentRow = {
+  id: string;
+  debate_id: string;
+  user_id: string;
+  position: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
   profiles: Profile;
 };
 
@@ -66,7 +73,7 @@ const DebateDetailPage = () => {
   });
   
   // Fetch arguments
-  const { data: argumentRows, isLoading: areArgumentsLoading } = useQuery({
+  const { data: argumentsData, isLoading: areArgumentsLoading } = useQuery({
     queryKey: ['debateArguments', id],
     queryFn: async () => {
       if (!id) return [];
@@ -80,7 +87,11 @@ const DebateDetailPage = () => {
         .eq('debate_id', id)
         .order('created_at', { ascending: false });
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching arguments:", error);
+        throw error;
+      }
+      
       return data as unknown as ArgumentRow[];
     },
     enabled: !!id
@@ -90,12 +101,12 @@ const DebateDetailPage = () => {
   const { data: votes } = useQuery({
     queryKey: ['argumentVotes', id],
     queryFn: async () => {
-      if (!id || !argumentRows?.length) return {};
+      if (!id || !argumentsData?.length) return {};
       
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
       
-      const argIds = argumentRows.map(arg => arg.id);
+      const argIds = argumentsData.map(arg => arg.id);
       
       const { data, error } = await supabase
         .from('votes')
@@ -108,11 +119,13 @@ const DebateDetailPage = () => {
       const voteCounts: Record<string, { upvotes: number, downvotes: number }> = {};
       const userVotes: Record<string, 'up' | 'down' | null> = {};
       
+      // Initialize all arguments with zero votes
+      argIds.forEach(argId => {
+        voteCounts[argId] = { upvotes: 0, downvotes: 0 };
+      });
+      
+      // Count votes for each argument
       data?.forEach(vote => {
-        if (!voteCounts[vote.argument_id]) {
-          voteCounts[vote.argument_id] = { upvotes: 0, downvotes: 0 };
-        }
-        
         if (vote.vote_type) {
           voteCounts[vote.argument_id].upvotes += 1;
         } else {
@@ -128,10 +141,10 @@ const DebateDetailPage = () => {
       setCurrentUserVotes(userVotes);
       return voteCounts;
     },
-    enabled: !!argumentRows?.length
+    enabled: !!argumentsData?.length
   });
   
-  // Set up real-time subscription for new arguments
+  // Set up real-time subscription for new arguments and votes
   useEffect(() => {
     if (!id) return;
     
@@ -158,8 +171,7 @@ const DebateDetailPage = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'votes',
-          filter: argumentRows?.length ? `argument_id=in.(${argumentRows.map(arg => arg.id).join(',')})` : undefined
+          table: 'votes'
         },
         () => {
           // Invalidate and refetch votes when changes happen
@@ -171,10 +183,10 @@ const DebateDetailPage = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id, queryClient, argumentRows]);
+  }, [id, queryClient, argumentsData]);
   
   // Transform raw data into the format expected by ArgumentCard component
-  const processedArguments: Argument[] = (argumentRows || []).map(argRow => {
+  const processedArguments: Argument[] = (argumentsData || []).map(argRow => {
     const voteInfo = votes?.[argRow.id] || { upvotes: 0, downvotes: 0 };
     
     return {
