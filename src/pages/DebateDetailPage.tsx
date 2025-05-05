@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +14,9 @@ import { Database } from "@/integrations/supabase/types";
 
 type Debate = Database['public']['Tables']['debates']['Row'];
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type ArgumentRow = {
+
+// Define the argument type correctly
+interface ArgumentRow {
   id: string;
   debate_id: string;
   user_id: string;
@@ -24,7 +25,7 @@ type ArgumentRow = {
   created_at: string;
   updated_at: string;
   profiles: Profile;
-};
+}
 
 const DebateDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -72,11 +73,13 @@ const DebateDetailPage = () => {
     enabled: !!debate?.created_by
   });
   
-  // Fetch arguments
+  // Fetch arguments with proper join to profiles table
   const { data: argumentsData, isLoading: areArgumentsLoading } = useQuery({
     queryKey: ['debateArguments', id],
     queryFn: async () => {
       if (!id) return [];
+      
+      console.log("Fetching arguments for debate:", id);
       
       const { data, error } = await supabase
         .from('arguments')
@@ -92,6 +95,7 @@ const DebateDetailPage = () => {
         throw error;
       }
       
+      console.log("Fetched arguments:", data);
       return data as unknown as ArgumentRow[];
     },
     enabled: !!id
@@ -159,6 +163,7 @@ const DebateDetailPage = () => {
           filter: `debate_id=eq.${id}`
         },
         () => {
+          console.log("Arguments changed, refetching...");
           // Invalidate and refetch arguments when changes happen
           queryClient.invalidateQueries({ queryKey: ['debateArguments', id] });
           
@@ -174,6 +179,7 @@ const DebateDetailPage = () => {
           table: 'votes'
         },
         () => {
+          console.log("Votes changed, refetching...");
           // Invalidate and refetch votes when changes happen
           queryClient.invalidateQueries({ queryKey: ['argumentVotes', id] });
         }
