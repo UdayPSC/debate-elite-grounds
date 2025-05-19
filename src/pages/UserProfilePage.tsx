@@ -101,8 +101,8 @@ const UserProfilePage = () => {
     enabled: !!profile?.id
   });
   
-  // Query to fetch arguments posted by the user
-  const { data: arguments: userArguments, isLoading: argumentsLoading } = useQuery({
+  // Query to fetch arguments posted by the user - Fixed the syntax error here
+  const { data: userArguments, isLoading: argumentsLoading } = useQuery({
     queryKey: ['userArguments', profile?.id],
     queryFn: async () => {
       if (!profile?.id) return [];
