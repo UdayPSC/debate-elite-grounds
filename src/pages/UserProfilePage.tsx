@@ -1,171 +1,130 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+
+import React, { useEffect, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import DebateCard from "@/components/debates/DebateCard";
-import ArgumentCard, { Argument } from "@/components/debates/ArgumentCard";
-import { Calendar, MessageSquare, Map, Trophy, Pencil, User, Settings, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { CalendarDays, MessageSquare, Award, Edit, LogOut } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { Database } from "@/integrations/supabase/types";
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
-type Debate = Database['public']['Tables']['debates']['Row'];
+// Define interface for Profile data
+interface Profile {
+  id: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  website: string | null;
+  created_at: string;
+}
 
+// Define interface for Debate data
+interface Debate {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  created_at: string;
+  created_by: string;
+  status: 'active' | 'completed';
+  featured: boolean;
+}
+
+// Define interface for raw argument data from Supabase
 interface ArgumentRow {
   id: string;
+  content: string;
+  position: string;
   debate_id: string;
   user_id: string;
-  position: string;
-  content: string;
   created_at: string;
   updated_at: string;
-  debate?: {
-    title?: string;
-  };
+  debate_title?: string;
+}
+
+// Define processed Argument data used in the component
+interface Argument {
+  id: string;
+  debateId: string;
+  content: string;
+  position: string;
+  createdAt: Date;
+  updatedAt: Date;
+  debateTitle?: string;
 }
 
 const UserProfilePage = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [isCurrentUser, setIsCurrentUser] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [userDebates, setUserDebates] = useState<Debate[]>([]);
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    username: '',
-    bio: '',
-    location: '',
-    expertise_areas: [] as string[],
-    newExpertiseArea: ''
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentUserVotes, setCurrentUserVotes] = useState<Record<string, 'up' | 'down' | null>>({});
   
-  // Fetch current user
-  const { data: currentUser } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: async () => {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) return null;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', sessionData.session.user.id)
-        .single();
-        
-      if (error) return null;
-      return data as Profile;
-    }
-  });
-  
-  // Fetch user profile from Supabase
-  const { data: profile, isLoading: isProfileLoading, error: profileError } = useQuery({
+  // Query to fetch the profile data
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', username],
     queryFn: async () => {
-      if (!username) return null;
-      
-      const { data, error } = await supabase
+      // Get profile by username
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('username', username)
-        .maybeSingle();
+        .single();
         
-      if (error) throw error;
-      return data as Profile | null;
+      if (profileError) throw profileError;
+      if (!profileData) throw new Error('Profile not found');
+      
+      // Check if the current user is viewing their own profile
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsCurrentUser(session?.user?.id === profileData.id);
+      
+      return profileData as Profile;
     }
   });
   
-  // Initialize edit form when profile is loaded
-  useEffect(() => {
-    if (profile) {
-      setEditForm({
-        full_name: profile.full_name || '',
-        username: profile.username || '',
-        bio: profile.bio || '',
-        location: profile.location || '',
-        expertise_areas: profile.expertise_areas || [],
-        newExpertiseArea: ''
-      });
-    }
-  }, [profile]);
+  // Query to fetch debates created by the user
+  const { data: debates, isLoading: debatesLoading } = useQuery({
+    queryKey: ['userDebates', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('debates')
+        .select('*')
+        .eq('created_by', profile.id);
+        
+      if (error) throw error;
+      return data as Debate[];
+    },
+    enabled: !!profile?.id
+  });
   
-  // Check if this is the current user's profile
-  useEffect(() => {
-    const checkCurrentUser = async () => {
-      if (profile && currentUser) {
-        setIsCurrentUser(profile.id === currentUser.id);
-      }
-    };
-    
-    checkCurrentUser();
-  }, [profile, currentUser]);
-  
-  // Fetch user's debates once we have the profile
-  useEffect(() => {
-    const fetchUserDebates = async () => {
-      if (profile?.id) {
-        const { data, error } = await supabase
-          .from('debates')
-          .select('*')
-          .eq('created_by', profile.id)
-          .order('created_at', { ascending: false });
-          
-        if (!error && data) {
-          setUserDebates(data as Debate[]);
-        }
-      }
-    };
-    
-    fetchUserDebates();
-  }, [profile?.id]);
-  
-  // Fetch user's arguments
-  const { data: userArguments, isLoading: isArgumentsLoading } = useQuery({
+  // Query to fetch arguments posted by the user
+  const { data: arguments: userArguments, isLoading: argumentsLoading } = useQuery({
     queryKey: ['userArguments', profile?.id],
     queryFn: async () => {
       if (!profile?.id) return [];
       
-      // First get arguments
+      // First get arguments by user
       const { data: argumentsData, error: argumentsError } = await supabase
         .from('arguments')
-        .select('*, debate:debate_id(title)')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false });
+        .select('*, debates(title)')
+        .eq('user_id', profile.id);
         
-      if (argumentsError) {
-        console.error("Error fetching user arguments:", argumentsError);
-        throw argumentsError;
-      }
-
-      // Process arguments
-      const processedArguments: Argument[] = (argumentsData || []).map((arg: ArgumentRow) => {
+      if (argumentsError) throw argumentsError;
+      
+      // Process arguments data
+      const processedArguments: Argument[] = (argumentsData || []).map((arg: any) => {
         return {
           id: arg.id,
           debateId: arg.debate_id,
-          userId: arg.user_id,
-          position: arg.position as 'for' | 'against',
           content: arg.content,
-          createdAt: new Date(arg.created_at || ''),
-          updatedAt: new Date(arg.updated_at || ''),
-          votes: {
-            upvotes: 0,
-            downvotes: 0,
-            userVote: null
-          },
-          user: {
-            username: profile.username || 'Unknown',
-            avatarUrl: profile.avatar_url || undefined
-          },
-          debateTitle: arg.debate?.title || 'Unknown Debate'
+          position: arg.position,
+          createdAt: new Date(arg.created_at),
+          updatedAt: new Date(arg.updated_at),
+          debateTitle: arg.debates?.title
         };
       });
       
@@ -174,392 +133,239 @@ const UserProfilePage = () => {
     enabled: !!profile?.id
   });
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setEditForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  const addExpertiseArea = () => {
-    if (editForm.newExpertiseArea.trim() && !editForm.expertise_areas.includes(editForm.newExpertiseArea.trim())) {
-      setEditForm(prev => ({
-        ...prev,
-        expertise_areas: [...prev.expertise_areas, prev.newExpertiseArea.trim()],
-        newExpertiseArea: ''
-      }));
-    }
-  };
-  
-  const removeExpertiseArea = (area: string) => {
-    setEditForm(prev => ({
-      ...prev,
-      expertise_areas: prev.expertise_areas.filter(a => a !== area)
-    }));
-  };
-  
-  const handleSaveProfile = async () => {
-    if (!currentUser) return;
-    
-    setIsSubmitting(true);
-    
+  const handleLogout = async () => {
     try {
-      // Check username uniqueness if changed
-      if (editForm.username !== profile?.username) {
-        const { data: existingUser } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('username', editForm.username)
-          .neq('id', currentUser.id)
-          .maybeSingle();
-          
-        if (existingUser) {
-          toast.error("Username is already taken");
-          setIsSubmitting(false);
-          return;
-        }
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        toast.error("Error signing out", {
+          description: error.message
+        });
+        return;
       }
       
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: editForm.full_name,
-          username: editForm.username,
-          bio: editForm.bio,
-          location: editForm.location,
-          expertise_areas: editForm.expertise_areas
-        })
-        .eq('id', currentUser.id);
-        
-      if (error) throw error;
-      
-      toast.success("Profile updated successfully");
-      setIsEditDialogOpen(false);
-      
-      // If username changed, navigate to new profile URL
-      if (editForm.username !== username) {
-        navigate(`/profile/${editForm.username}`);
-      }
-      
-      // Invalidate cache to refresh data
-      queryClient.invalidateQueries({ queryKey: ['profile', username] });
-      queryClient.invalidateQueries({ queryKey: ['profile', editForm.username] });
-      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
-      
+      toast.success("Signed out successfully");
+      navigate("/");
     } catch (error) {
-      console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
-    } finally {
-      setIsSubmitting(false);
+      console.error("Logout error:", error);
+      toast.error("An unexpected error occurred");
     }
   };
   
-  if (isProfileLoading) {
-    return <div className="flex justify-center items-center py-12">Loading profile...</div>;
+  if (profileLoading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-elitePurple"></div>
+      </div>
+    );
   }
   
-  if (profileError || !profile) {
-    return <div className="text-center py-12">User not found</div>;
-  }
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
-      year: 'numeric'
-    });
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto">
-      {/* Profile Header */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6 animate-fade-in">
-        <div className="h-40 bg-gradient-to-r from-eliteNavy via-elitePurple to-indigo-500 relative">
-          {isCurrentUser && (
-            <Button 
-              onClick={() => setIsEditDialogOpen(true)}
-              className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white border border-white/30"
-              size="sm"
-            >
-              <Pencil className="h-4 w-4 mr-2" /> Edit Profile
-            </Button>
-          )}
-        </div>
-        <div className="px-6 pb-6 relative">
-          <div className="flex flex-col md:flex-row md:items-end gap-4 -mt-16 mb-6">
-            <div className="h-32 w-32 rounded-full bg-white p-2 shadow-lg">
-              {profile.avatar_url ? (
-                <img 
-                  src={profile.avatar_url} 
-                  alt={profile.full_name || profile.username} 
-                  className="h-full w-full object-cover rounded-full"
-                />
-              ) : (
-                <div className="h-full w-full bg-gradient-to-br from-elitePurple to-eliteNavy rounded-full flex items-center justify-center text-white text-4xl font-bold">
-                  {(profile.full_name || profile.username).charAt(0)}
-                </div>
-              )}
-            </div>
-            <div className="md:flex-1">
-              <h1 className="text-2xl font-bold text-eliteNavy">{profile.full_name || ''}</h1>
-              <p className="text-eliteMediumGray">@{profile.username}</p>
-            </div>
-            {!isCurrentUser && (
-              <Button className="bg-elitePurple hover:bg-elitePurple/90 text-white transition-all">
-                Follow
-              </Button>
-            )}
-          </div>
-          
-          <div className="space-y-4">
-            {profile.bio && (
-              <p className="text-eliteDarkGray">{profile.bio}</p>
-            )}
-            
-            <div className="flex flex-wrap gap-2">
-              {profile.expertise_areas?.map((area) => (
-                <Badge key={area} variant="secondary" className="bg-eliteLightPurple text-elitePurple border border-elitePurple/20">
-                  {area}
-                </Badge>
-              ))}
-            </div>
-            
-            <div className="flex flex-wrap gap-y-2 gap-x-6 text-sm text-eliteMediumGray mt-4 pt-4 border-t">
-              {profile.location && (
-                <div className="flex items-center">
-                  <Map className="h-4 w-4 mr-1" />
-                  <span>{profile.location}</span>
-                </div>
-              )}
-              <div className="flex items-center">
-                <Calendar className="h-4 w-4 mr-1" />
-                <span>Joined {formatDate(profile.created_at)}</span>
-              </div>
-              <div className="flex items-center">
-                <MessageSquare className="h-4 w-4 mr-1" />
-                <span>{userDebates.length} debates started</span>
-              </div>
-              <div className="flex items-center">
-                <Trophy className="h-4 w-4 mr-1" />
-                <span>Top 5% debater</span>
-              </div>
-            </div>
-          </div>
-        </div>
+  if (!profile) {
+    return (
+      <div className="text-center py-20">
+        <h1 className="text-2xl font-bold mb-4">User not found</h1>
+        <p className="mb-6">The user you're looking for doesn't exist or has deleted their account.</p>
+        <Button asChild>
+          <Link to="/">Return Home</Link>
+        </Button>
       </div>
-      
-      {/* Profile Content */}
-      <Tabs defaultValue="debates" className="mb-6 animate-fade-in">
-        <TabsList className="bg-eliteGray">
-          <TabsTrigger value="debates" className="data-[state=active]:bg-white data-[state=active]:text-elitePurple">
-            Debates
-          </TabsTrigger>
-          <TabsTrigger value="arguments" className="data-[state=active]:bg-white data-[state=active]:text-elitePurple">
-            Arguments
-          </TabsTrigger>
-          <TabsTrigger value="achievements" className="data-[state=active]:bg-white data-[state=active]:text-elitePurple">
-            Achievements
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="debates" className="mt-6">
-          {userDebates.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {userDebates.map(debate => (
-                <DebateCard 
-                  key={debate.id} 
-                  debate={{
-                    id: debate.id,
-                    title: debate.title,
-                    description: debate.description,
-                    category: debate.category,
-                    createdBy: debate.created_by,
-                    createdAt: new Date(debate.created_at || ''),
-                    endsAt: new Date(debate.ends_at),
-                    status: debate.status as 'active' | 'completed',
-                    participantCount: debate.participant_count || 0,
-                    argumentCount: debate.argument_count || 0,
-                    featured: debate.featured || false
-                  }} 
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-white rounded-lg border">
-              <User className="mx-auto h-12 w-12 text-eliteMediumGray/30 mb-2" />
-              <p className="text-eliteMediumGray">This user hasn't started any debates yet.</p>
-              {isCurrentUser && (
-                <Button 
-                  onClick={() => navigate('/debates/create')} 
-                  className="mt-4 bg-elitePurple hover:bg-elitePurple/90 text-white"
-                >
-                  Start a Debate
-                </Button>
-              )}
-            </div>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="arguments" className="mt-6">
-          {isArgumentsLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-elitePurple" />
-            </div>
-          ) : userArguments && userArguments.length > 0 ? (
-            <div className="space-y-4">
-              {userArguments.map(argument => (
-                <div key={argument.id} className="bg-white rounded-lg border p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-semibold text-sm text-eliteMediumGray">
-                      On debate: <span className="text-eliteNavy cursor-pointer hover:underline" onClick={() => navigate(`/debates/${argument.debateId}`)}>{argument.debateTitle}</span>
-                    </h4>
-                    <Badge variant="outline" className={argument.position === 'for' ? 'text-green-600 border-green-300 bg-green-50' : 'text-red-600 border-red-300 bg-red-50'}>
-                      {argument.position === 'for' ? 'For' : 'Against'}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-eliteDarkGray mb-2">{argument.content}</p>
-                  <div className="flex justify-between items-center">
-                    <div className="text-xs text-eliteMediumGray">
-                      {new Date(argument.createdAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </div>
+    );
+  }
+  
+  return (
+    <div className="container max-w-5xl py-8 animate-fade-in">
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Profile Sidebar */}
+        <div className="w-full lg:w-1/3">
+          <Card className="glass-card">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center">
+                <div className="relative mb-4">
+                  <Avatar className="w-24 h-24 border-4 border-primary/30">
+                    {profile.avatar_url ? (
+                      <AvatarImage src={profile.avatar_url} alt={profile.username} />
+                    ) : (
+                      <AvatarFallback className="bg-primary/20 text-primary-foreground text-2xl">
+                        {profile.username.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  {isCurrentUser && (
                     <Button 
-                      variant="ghost" 
                       size="sm" 
-                      className="text-xs text-elitePurple hover:bg-eliteLightPurple"
-                      onClick={() => navigate(`/debates/${argument.debateId}`)}
+                      variant="outline" 
+                      className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-1 glass-button"
                     >
-                      Go to Debate
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                
+                <h1 className="text-2xl font-bold">{profile.full_name || profile.username}</h1>
+                <p className="text-muted-foreground mb-2">@{profile.username}</p>
+                
+                {profile.bio && (
+                  <p className="text-center text-sm my-4">{profile.bio}</p>
+                )}
+                
+                <div className="flex items-center text-sm text-muted-foreground mb-4">
+                  <CalendarDays className="h-4 w-4 mr-1" />
+                  <span>Joined {new Date(profile.created_at).toLocaleDateString()}</span>
+                </div>
+                
+                {profile.website && (
+                  <a 
+                    href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-sm text-primary hover:underline mb-6"
+                  >
+                    {profile.website}
+                  </a>
+                )}
+                
+                {isCurrentUser ? (
+                  <div className="flex flex-col w-full gap-2 mt-2">
+                    <Button className="bg-gradient-to-r from-elitePurple to-eliteBlue hover:opacity-90" asChild>
+                      <Link to="/settings">Edit Profile</Link>
+                    </Button>
+                    <Button variant="outline" className="glass-button" onClick={handleLogout}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
                     </Button>
                   </div>
+                ) : (
+                  <Button className="w-full bg-gradient-to-r from-elitePurple to-eliteBlue hover:opacity-90">
+                    Follow
+                  </Button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2 text-center mt-6 py-4 border-t border-border/40">
+                <div>
+                  <p className="font-bold text-xl">{debates?.length || 0}</p>
+                  <p className="text-xs text-muted-foreground">Debates</p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-white rounded-lg border">
-              <MessageSquare className="mx-auto h-12 w-12 text-eliteMediumGray/30 mb-2" />
-              <p className="text-eliteMediumGray">No arguments by this user yet.</p>
-            </div>
-          )}
-        </TabsContent>
+                <div>
+                  <p className="font-bold text-xl">{userArguments?.length || 0}</p>
+                  <p className="text-xs text-muted-foreground">Arguments</p>
+                </div>
+                <div>
+                  <p className="font-bold text-xl">0</p>
+                  <p className="text-xs text-muted-foreground">Followers</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
         
-        <TabsContent value="achievements" className="mt-6">
-          <div className="text-center py-12 bg-white rounded-lg border">
-            <Trophy className="mx-auto h-12 w-12 text-eliteMediumGray/30 mb-2" />
-            <p className="text-eliteMediumGray">User's achievements will be displayed here.</p>
-          </div>
-        </TabsContent>
-      </Tabs>
-      
-      {/* Edit Profile Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Profile</DialogTitle>
-            <DialogDescription>
-              Update your profile information visible to other users.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="full_name">Full Name</Label>
-              <Input
-                id="full_name"
-                name="full_name"
-                value={editForm.full_name}
-                onChange={handleInputChange}
-                placeholder="Your full name"
-              />
-            </div>
+        {/* Profile Content */}
+        <div className="w-full lg:w-2/3">
+          <Tabs defaultValue="debates" className="w-full">
+            <TabsList className="w-full mb-6 bg-card/30 backdrop-blur-sm">
+              <TabsTrigger value="debates" className="flex-1">Debates</TabsTrigger>
+              <TabsTrigger value="arguments" className="flex-1">Arguments</TabsTrigger>
+              <TabsTrigger value="awards" className="flex-1">Awards</TabsTrigger>
+            </TabsList>
             
-            <div className="grid gap-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                name="username"
-                value={editForm.username}
-                onChange={handleInputChange}
-                placeholder="username"
-              />
-            </div>
+            {/* Debates Tab */}
+            <TabsContent value="debates" className="space-y-4">
+              {debatesLoading ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-elitePurple"></div>
+                </div>
+              ) : debates && debates.length > 0 ? (
+                <div className="space-y-4">
+                  {debates.map(debate => (
+                    <Card key={debate.id} className="glass-card overflow-hidden hover-lift hover-glow">
+                      <Link to={`/debates/${debate.id}`} className="block">
+                        <CardContent className="p-4">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex justify-between items-start">
+                              <h3 className="font-bold text-lg">{debate.title}</h3>
+                              <Badge variant={debate.status === 'active' ? 'default' : 'secondary'}>
+                                {debate.status === 'active' ? 'Active' : 'Completed'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2">{debate.description}</p>
+                            <div className="flex justify-between items-center text-xs text-muted-foreground mt-2">
+                              <span>{new Date(debate.created_at).toLocaleDateString()}</span>
+                              <Badge variant="outline" className="capitalize">{debate.category}</Badge>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Link>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-card/30 backdrop-blur-sm rounded-lg">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium">No debates yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">This user hasn't created any debates yet.</p>
+                  {isCurrentUser && (
+                    <Button asChild>
+                      <Link to="/debates/create">Start a Debate</Link>
+                    </Button>
+                  )}
+                </div>
+              )}
+            </TabsContent>
             
-            <div className="grid gap-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                name="bio"
-                value={editForm.bio}
-                onChange={handleInputChange}
-                placeholder="Tell others about yourself..."
-                className="resize-none"
-                rows={3}
-              />
-            </div>
+            {/* Arguments Tab */}
+            <TabsContent value="arguments" className="space-y-4">
+              {argumentsLoading ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-elitePurple"></div>
+                </div>
+              ) : userArguments && userArguments.length > 0 ? (
+                <div className="space-y-4">
+                  {userArguments.map(argument => (
+                    <Card key={argument.id} className="glass-card overflow-hidden hover-lift">
+                      <Link to={`/debates/${argument.debateId}`} className="block">
+                        <CardContent className="p-4">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex justify-between items-start">
+                              <h3 className="font-medium">{argument.debateTitle || "Debate"}</h3>
+                              <Badge variant={argument.position === 'for' ? 'default' : 'destructive'} className="capitalize">
+                                {argument.position}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{argument.content}</p>
+                            <div className="text-xs text-muted-foreground mt-2">
+                              {argument.createdAt.toLocaleDateString()}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Link>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-card/30 backdrop-blur-sm rounded-lg">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium">No arguments yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">This user hasn't posted any arguments yet.</p>
+                  {isCurrentUser && (
+                    <Button asChild>
+                      <Link to="/debates">Join a Debate</Link>
+                    </Button>
+                  )}
+                </div>
+              )}
+            </TabsContent>
             
-            <div className="grid gap-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                name="location"
-                value={editForm.location}
-                onChange={handleInputChange}
-                placeholder="Your location"
-              />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label>Expertise Areas</Label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {editForm.expertise_areas.map(area => (
-                  <Badge key={area} variant="secondary" className="group">
-                    {area}
-                    <button 
-                      type="button"
-                      onClick={() => removeExpertiseArea(area)}
-                      className="ml-1 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
+            {/* Awards Tab */}
+            <TabsContent value="awards">
+              <div className="text-center py-12 bg-card/30 backdrop-blur-sm rounded-lg">
+                <Award className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium">No awards yet</h3>
+                <p className="text-sm text-muted-foreground">Participate in debates to earn awards!</p>
               </div>
-              <div className="flex gap-2">
-                <Input
-                  id="newExpertiseArea"
-                  name="newExpertiseArea"
-                  value={editForm.newExpertiseArea}
-                  onChange={handleInputChange}
-                  placeholder="Add expertise (e.g., Technology, Politics)"
-                  className="flex-1"
-                />
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={addExpertiseArea}
-                  disabled={!editForm.newExpertiseArea.trim()}
-                >
-                  Add
-                </Button>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-            <Button 
-              onClick={handleSaveProfile} 
-              className="bg-elitePurple hover:bg-elitePurple/90 text-white"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
   );
 };

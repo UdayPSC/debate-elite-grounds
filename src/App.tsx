@@ -13,6 +13,10 @@ import CreateDebatePage from "./pages/CreateDebatePage";
 import DebateDetailPage from "./pages/DebateDetailPage";
 import DebatesPage from "./pages/DebatesPage";
 import UserProfilePage from "./pages/UserProfilePage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import GuidelinesPage from "./pages/GuidelinesPage";
+import ContactPage from "./pages/ContactPage";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +35,10 @@ const App = () => (
             <Route path="/debates/create" element={<CreateDebatePage />} />
             <Route path="/debates/:id" element={<DebateDetailPage />} />
             <Route path="/profile/:username" element={<UserProfilePage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/guidelines" element={<GuidelinesPage />} />
+            <Route path="/contact" element={<ContactPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </MainLayout>

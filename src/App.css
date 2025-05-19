@@ -1,42 +1,35 @@
+
+/* Remove default styles that might conflict with our new design */
 #root {
-  max-width: 1280px;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Modern Card Styling */
+.modern-card {
+  @apply backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl shadow-lg transition-all duration-300;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.modern-card:hover {
+  @apply shadow-xl border-white/20;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+/* 3D Floating Elements */
+.floating-element {
+  animation: float 5s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
   }
 }
 
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+/* Gradient Text */
+.gradient-text {
+  @apply bg-gradient-to-r from-elitePurple to-eliteBlue bg-clip-text text-transparent;
 }
