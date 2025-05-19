@@ -10,16 +10,20 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, MessageSquare, Award, Edit, LogOut } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
+import { Json } from "@/integrations/supabase/types";
 
-// Define interface for Profile data
+// Define interface for Profile data - updated to match Supabase structure
 interface Profile {
   id: string;
   username: string;
   full_name: string | null;
   avatar_url: string | null;
   bio: string | null;
-  website: string | null;
+  website?: string | null; // Made optional with ? since it doesn't exist in the database
   created_at: string;
+  location?: string | null;
+  expertise_areas?: string[] | null;
+  social_links?: Json | null;
 }
 
 // Define interface for Debate data
