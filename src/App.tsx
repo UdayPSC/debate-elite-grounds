@@ -19,7 +19,6 @@ import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import GuidelinesPage from "./pages/GuidelinesPage";
 import ContactPage from "./pages/ContactPage";
-import { CommandSearch } from "./components/search/CommandSearch";
 
 const queryClient = new QueryClient();
 
@@ -31,7 +30,6 @@ const App = () => (
           <Toaster />
           <Sonner />
           <MainLayout>
-            <CommandSearch />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<LoginPage />} />

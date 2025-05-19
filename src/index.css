@@ -248,6 +248,15 @@
   @apply text-gray-300 !important;
 }
 
+.improved-dark-text .glass-card {
+  @apply text-white !important;
+}
+
+.improved-dark-text .dark .text-foreground\/70,
+.improved-dark-text .dark .text-foreground\/80 {
+  @apply text-white/90 !important;
+}
+
 /* Command dialog styles */
 dialog::backdrop {
   @apply bg-black/50 backdrop-blur-sm;

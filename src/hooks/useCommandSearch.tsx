@@ -1,5 +1,5 @@
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +15,6 @@ type CommandSearchResult = {
 
 export function useCommandSearch() {
   const navigate = useNavigate();
-  const commandDialogRef = useRef<HTMLDialogElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   
   // Query for search results
@@ -60,62 +59,17 @@ export function useCommandSearch() {
     enabled: false,
   });
   
-  const toggleSearch = useCallback(() => {
-    if (!commandDialogRef.current) {
-      const dialog = document.getElementById('command-dialog') as HTMLDialogElement;
-      commandDialogRef.current = dialog;
-    }
-    
-    if (commandDialogRef.current) {
-      if (commandDialogRef.current.open) {
-        commandDialogRef.current.close();
-      } else {
-        commandDialogRef.current.showModal();
-        // Focus on input inside dialog
-        setTimeout(() => {
-          const input = document.querySelector('#command-dialog input') as HTMLInputElement;
-          if (input) {
-            input.focus();
-          }
-        }, 100);
-      }
-    }
-  }, []);
-  
   const handleSelectResult = useCallback((result: CommandSearchResult) => {
     if (result.type === "debate") {
       navigate(`/debates/${result.id}`);
     } else if (result.type === "profile") {
       navigate(`/profile/${result.username}`);
     }
-    
-    if (commandDialogRef.current?.open) {
-      commandDialogRef.current.close();
-    }
   }, [navigate]);
-  
-  useEffect(() => {
-    // Handle Cmd+K / Ctrl+K shortcut
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        toggleSearch();
-      }
-      
-      // Close on escape
-      if (e.key === 'Escape' && commandDialogRef.current?.open) {
-        commandDialogRef.current.close();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSearch]);
   
   return {
     searchResults,
     refetch,
-    toggleSearch,
     searchInputRef,
     handleSelectResult
   };

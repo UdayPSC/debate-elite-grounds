@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { FloatingShapes } from "@/components/ui/animated-background";
-import { useCommandSearch } from "@/hooks/useCommandSearch";
+import { CommandSearch } from "@/components/search/CommandSearch";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -16,8 +16,8 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
   const navigate = useNavigate();
-  const { toggleSearch, searchInputRef } = useCommandSearch();
 
   useEffect(() => {
     // Check current auth state on component mount
@@ -88,6 +88,29 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     }
   };
 
+  // Toggle search visibility
+  const toggleSearch = () => {
+    setShowSearch(!showSearch);
+  };
+
+  // Handle keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        toggleSearch();
+      }
+      
+      // Close on escape
+      if (e.key === 'Escape' && showSearch) {
+        setShowSearch(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSearch]);
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <FloatingShapes />
@@ -105,15 +128,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           
           <div className="flex items-center space-x-4">
             <div className="relative hidden md:block">
-              <input
-                type="text"
-                placeholder="Search debates..."
-                className="glass-input bg-background/50 pl-10 pr-4 py-2 rounded-full text-sm w-64 focus:outline-none focus:ring-1 focus:ring-elitePurple"
+              <Button 
+                variant="outline" 
+                className="glass-button flex items-center px-4 py-2 rounded-full"
                 onClick={toggleSearch}
-                ref={searchInputRef}
-                readOnly
-              />
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-foreground/50" />
+              >
+                <Search className="h-4 w-4 mr-2 text-foreground/70" />
+                <span className="text-foreground/70">Search...</span>
+                <span className="ml-2 text-xs text-foreground/50 hidden sm:inline">(Ctrl+K)</span>
+              </Button>
             </div>
             
             <ThemeToggle />
@@ -202,6 +225,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
         </div>
       </header>
+      
+      {/* Search Overlay */}
+      {showSearch && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center pt-20 p-4">
+          <div className="w-full max-w-xl">
+            <CommandSearch />
+            <p className="text-center text-sm text-white/70 mt-4">
+              Press ESC to close
+            </p>
+          </div>
+        </div>
+      )}
       
       <main className="flex-grow container mx-auto px-4 py-6">
         {children}
