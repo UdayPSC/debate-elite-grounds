@@ -147,7 +147,7 @@ const UserProfilePage = () => {
       }
 
       // Process arguments
-      const processedArguments: Argument[] = (argumentsData || []).map(arg => {
+      const processedArguments: Argument[] = (argumentsData || []).map((arg: ArgumentRow) => {
         return {
           id: arg.id,
           debateId: arg.debate_id,
