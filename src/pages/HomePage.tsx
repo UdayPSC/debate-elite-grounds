@@ -1,194 +1,96 @@
 
-import React, { useState } from "react";
-import { categories } from "@/data/mockData";
-import DebateCard from "@/components/debates/DebateCard";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { Database } from "@/integrations/supabase/types";
-import { Loader2 } from "lucide-react";
-
-type Debate = Database['public']['Tables']['debates']['Row'];
 
 const HomePage = () => {
-  const [activeCategory, setActiveCategory] = useState<string>("all");
-  
-  const { data: debates, isLoading, error } = useQuery({
-    queryKey: ['homepageDebates'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('debates')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
-      return data as Debate[];
-    }
-  });
-  
-  const featuredDebate = debates?.find(debate => debate.featured);
-  const activeDebates = debates?.filter(debate => 
-    !debate.featured && (activeCategory === "all" || debate.category === activeCategory)
-  ) || [];
-  
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
-      <section className="text-center mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-eliteNavy mb-2">Welcome to Elite<span className="text-elitePurple">Minds</span></h1>
-        <p className="text-eliteMediumGray max-w-2xl mx-auto">
-          A platform for thoughtful debate and discourse on important topics. Join our community of critical thinkers!
-        </p>
-        <div className="flex justify-center mt-6 gap-4">
-          <Button
-            className="bg-elitePurple hover:bg-elitePurple/90 text-white"
-            size="lg"
-            asChild
-          >
-            <Link to="/register">Join the Community</Link>
-          </Button>
-          <Button
-            variant="outline"
-            className="border-elitePurple text-elitePurple hover:bg-eliteLightPurple"
-            size="lg"
-            asChild
-          >
-            <Link to="/debates">Browse Debates</Link>
-          </Button>
+    <div className="space-y-16 pb-16">
+      {/* Hero Section */}
+      <section className="py-12 md:py-20 relative">
+        <div className="relative z-10 text-center space-y-6 max-w-3xl mx-auto px-4">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight bg-gradient-to-r from-elitePurple to-eliteBlue bg-clip-text text-transparent">
+            Elite minds debate with evidence and reason
+          </h1>
+          <p className="text-lg md:text-xl text-foreground/80 max-w-2xl mx-auto">
+            Join a community where ideas are challenged, refined, and elevated through structured, 
+            respectful debate based on evidence and sound reasoning.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <Button size="lg" className="bg-elitePurple hover:bg-elitePurple/90" asChild>
+              <Link to="/debates">Explore Debates</Link>
+            </Button>
+            <Button size="lg" variant="outline" className="glass-button" asChild>
+              <Link to="/register">Sign Up</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-12">
+        <div className="container px-4">
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">Why Elite Minds?</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Feature 1 */}
+            <div className="glass-card p-6 hover-lift hover-glow">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-elitePurple to-eliteBlue flex items-center justify-center mb-4 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3v18M3 12h18"></path>
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-center mb-2">Structured Debates</h3>
+              <p className="text-foreground/70 text-center">
+                Clear format with propositions, rebuttals, and conclusions that encourage well-constructed arguments.
+              </p>
+            </div>
+            
+            {/* Feature 2 */}
+            <div className="glass-card p-6 hover-lift hover-glow">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-elitePurple to-eliteBlue flex items-center justify-center mb-4 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M12 8v4l2 2"></path>
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-center mb-2">Real-time Engagement</h3>
+              <p className="text-foreground/70 text-center">
+                Participate in live debates with typing indicators, reactions, and instant updates.
+              </p>
+            </div>
+            
+            {/* Feature 3 */}
+            <div className="glass-card p-6 hover-lift hover-glow">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-elitePurple to-eliteBlue flex items-center justify-center mb-4 mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m12 8-9.04 9.06a2.82 2.82 0 1 0 3.98 3.98L16 12"></path>
+                  <circle cx="17" cy="7" r="5"></circle>
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-center mb-2">Evidence-Based</h3>
+              <p className="text-foreground/70 text-center">
+                Support arguments with citations, links, and references for a more credible debate experience.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
       
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-elitePurple" />
+      {/* CTA Section */}
+      <section className="relative py-16">
+        <div className="absolute inset-0 bg-gradient-to-r from-elitePurple/20 to-eliteBlue/20 rounded-3xl mx-4 md:mx-12 -z-10"></div>
+        <div className="relative glass-card mx-4 md:mx-12 p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-4 text-center md:text-left">
+            <h2 className="text-2xl md:text-3xl font-bold">Ready to join the conversation?</h2>
+            <p className="text-lg text-foreground/70">
+              Create an account today and start engaging with top minds on topics that matter.
+            </p>
+          </div>
+          <Button size="lg" className="bg-elitePurple hover:bg-elitePurple/90 min-w-40" asChild>
+            <Link to="/register">Get Started</Link>
+          </Button>
         </div>
-      ) : featuredDebate && (
-        <section className="mb-10">
-          <h2 className="text-xl font-bold text-eliteNavy mb-4">Featured Debate</h2>
-          <DebateCard 
-            debate={{
-              id: featuredDebate.id,
-              title: featuredDebate.title,
-              description: featuredDebate.description,
-              category: featuredDebate.category,
-              createdBy: featuredDebate.created_by,
-              createdAt: new Date(featuredDebate.created_at || ''),
-              endsAt: new Date(featuredDebate.ends_at),
-              status: featuredDebate.status as 'active' | 'completed',
-              participantCount: featuredDebate.participant_count || 0,
-              argumentCount: featuredDebate.argument_count || 0,
-              featured: featuredDebate.featured || false
-            }} 
-            featured={true} 
-          />
-        </section>
-      )}
-      
-      <section>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-eliteNavy">Active Debates</h2>
-        </div>
-        
-        <Tabs defaultValue="all" className="mb-6">
-          <TabsList className="bg-eliteGray">
-            <TabsTrigger 
-              value="all" 
-              onClick={() => setActiveCategory("all")}
-              className="data-[state=active]:bg-white data-[state=active]:text-elitePurple"
-            >
-              All
-            </TabsTrigger>
-            {categories.slice(0, 5).map((category) => (
-              <TabsTrigger 
-                key={category} 
-                value={category}
-                onClick={() => setActiveCategory(category)}
-                className="data-[state=active]:bg-white data-[state=active]:text-elitePurple"
-              >
-                {category}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          
-          <TabsContent value="all" className="mt-4">
-            {isLoading ? (
-              <div className="flex justify-center items-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-elitePurple" />
-              </div>
-            ) : error ? (
-              <div className="text-center py-12 bg-white rounded-lg border">
-                <p className="text-red-500">Failed to load debates</p>
-              </div>
-            ) : activeDebates.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {activeDebates.map((debate) => (
-                  <DebateCard 
-                    key={debate.id} 
-                    debate={{
-                      id: debate.id,
-                      title: debate.title,
-                      description: debate.description,
-                      category: debate.category,
-                      createdBy: debate.created_by,
-                      createdAt: new Date(debate.created_at || ''),
-                      endsAt: new Date(debate.ends_at),
-                      status: debate.status as 'active' | 'completed',
-                      participantCount: debate.participant_count || 0,
-                      argumentCount: debate.argument_count || 0,
-                      featured: debate.featured || false
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-white rounded-lg border">
-                <p className="text-eliteMediumGray">No debates found. Be the first to create a debate!</p>
-              </div>
-            )}
-          </TabsContent>
-          
-          {categories.slice(0, 5).map((category) => (
-            <TabsContent key={category} value={category} className="mt-4">
-              {isLoading ? (
-                <div className="flex justify-center items-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-elitePurple" />
-                </div>
-              ) : error ? (
-                <div className="text-center py-12 bg-white rounded-lg border">
-                  <p className="text-red-500">Failed to load debates</p>
-                </div>
-              ) : activeDebates.filter(d => d.category === category).length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {activeDebates
-                    .filter(debate => debate.category === category)
-                    .map((debate) => (
-                      <DebateCard 
-                        key={debate.id} 
-                        debate={{
-                          id: debate.id,
-                          title: debate.title,
-                          description: debate.description,
-                          category: debate.category,
-                          createdBy: debate.created_by,
-                          createdAt: new Date(debate.created_at || ''),
-                          endsAt: new Date(debate.ends_at),
-                          status: debate.status as 'active' | 'completed',
-                          participantCount: debate.participant_count || 0,
-                          argumentCount: debate.argument_count || 0,
-                          featured: debate.featured || false
-                        }}
-                      />
-                    ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 bg-white rounded-lg border">
-                  <p className="text-eliteMediumGray">No debates found in this category.</p>
-                </div>
-              )}
-            </TabsContent>
-          ))}
-        </Tabs>
       </section>
     </div>
   );
