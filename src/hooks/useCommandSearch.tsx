@@ -1,5 +1,5 @@
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,13 +16,13 @@ type CommandSearchResult = {
 export function useCommandSearch() {
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
   
   // Query for search results
-  const { data: searchResults, refetch } = useQuery({
-    queryKey: ["search-results"],
+  const { data: searchResults, refetch, isLoading } = useQuery({
+    queryKey: ["search-results", searchTerm],
     queryFn: async () => {
-      const searchTerm = searchInputRef.current?.value || "";
-      if (!searchTerm || searchTerm.length < 3) return [];
+      if (!searchTerm || searchTerm.length < 2) return [];
       
       // Get debates that match
       const { data: debates } = await supabase
@@ -56,7 +56,7 @@ export function useCommandSearch() {
       
       return results;
     },
-    enabled: false,
+    enabled: searchTerm.length >= 2,
   });
   
   const handleSelectResult = useCallback((result: CommandSearchResult) => {
@@ -65,12 +65,16 @@ export function useCommandSearch() {
     } else if (result.type === "profile") {
       navigate(`/profile/${result.username}`);
     }
+    setSearchTerm("");
   }, [navigate]);
   
   return {
     searchResults,
     refetch,
     searchInputRef,
-    handleSelectResult
+    handleSelectResult,
+    searchTerm,
+    setSearchTerm,
+    isLoading
   };
 }

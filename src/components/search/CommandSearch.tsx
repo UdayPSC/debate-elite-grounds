@@ -1,26 +1,21 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from "@/components/ui/command";
 import { useCommandSearch } from "@/hooks/useCommandSearch";
 import { File, User } from "lucide-react";
 
 export function CommandSearch() {
-  const { refetch, searchResults, handleSelectResult } = useCommandSearch();
-  const [searchTerm, setSearchTerm] = useState("");
-  
-  useEffect(() => {
-    if (searchTerm.length >= 2) {
-      const timer = setTimeout(() => {
-        refetch();
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [searchTerm, refetch]);
+  const { 
+    searchResults, 
+    handleSelectResult, 
+    searchTerm, 
+    setSearchTerm,
+    isLoading 
+  } = useCommandSearch();
   
   return (
-    <div className="w-full max-w-lg mx-auto">
-      <Command className="rounded-lg border shadow-md bg-popover text-foreground">
+    <div className="w-full">
+      <Command className="rounded-lg border shadow-md bg-popover">
         <CommandInput 
           placeholder="Search for debates, users..." 
           value={searchTerm}
@@ -28,7 +23,7 @@ export function CommandSearch() {
           className="h-12"
         />
         {searchTerm.length >= 2 && (
-          <CommandList>
+          <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>No results found.</CommandEmpty>
             
             {searchResults && searchResults.length > 0 && (
@@ -45,9 +40,9 @@ export function CommandSearch() {
                       >
                         <File className="mr-2 h-4 w-4 text-muted-foreground" />
                         <div className="flex flex-col">
-                          <span className="font-medium">{debate.title}</span>
+                          <span className="font-medium text-foreground">{debate.title}</span>
                           {debate.description && (
-                            <span className="text-xs text-muted-foreground line-clamp-1">
+                            <span className="text-xs text-foreground line-clamp-1">
                               {debate.description}
                             </span>
                           )}
@@ -67,7 +62,7 @@ export function CommandSearch() {
                         className="flex items-center p-2"
                       >
                         <User className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{profile.title}</span>
+                        <span className="font-medium text-foreground">{profile.title}</span>
                       </CommandItem>
                     ))}
                 </CommandGroup>

@@ -11,6 +11,7 @@ import { toast } from "@/components/ui/sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { ArrowLeft, Upload, User } from "lucide-react";
 
+// Define profile type based on the actual database structure
 interface ProfileData {
   id: string;
   username: string;
@@ -18,7 +19,7 @@ interface ProfileData {
   avatar_url: string | null;
   bio: string | null;
   location: string | null; 
-  website: string | null;
+  website: string | null; // Added this field to match the form
   expertise_areas: string[] | null;
 }
 
@@ -37,7 +38,7 @@ const EditProfilePage = () => {
     avatar_url: null,
     bio: "",
     location: "",
-    website: "",
+    website: "", // Initialize with empty string
     expertise_areas: []
   });
   
@@ -74,7 +75,7 @@ const EditProfilePage = () => {
             avatar_url: data.avatar_url,
             bio: data.bio || "",
             location: data.location || "",
-            website: data.website || "",
+            website: data.website || "", // Handle website field from the database
             expertise_areas: data.expertise_areas || []
           });
           
@@ -149,7 +150,7 @@ const EditProfilePage = () => {
           bio: profile.bio,
           avatar_url: avatarUrl,
           location: profile.location,
-          website: profile.website,
+          website: profile.website, // Save website field
           expertise_areas: profile.expertise_areas,
           updated_at: new Date().toISOString()
         })

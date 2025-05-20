@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -128,15 +127,21 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           
           <div className="flex items-center space-x-4">
             <div className="relative hidden md:block">
-              <Button 
-                variant="outline" 
-                className="glass-button flex items-center px-4 py-2 rounded-full"
-                onClick={toggleSearch}
-              >
-                <Search className="h-4 w-4 mr-2 text-foreground/70" />
-                <span className="text-foreground/70">Search...</span>
-                <span className="ml-2 text-xs text-foreground/50 hidden sm:inline">(Ctrl+K)</span>
-              </Button>
+              {showSearch ? (
+                <div className="absolute right-0 top-0 w-64">
+                  <CommandSearch />
+                </div>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  className="glass-button flex items-center px-4 py-2 rounded-full"
+                  onClick={toggleSearch}
+                >
+                  <Search className="h-4 w-4 mr-2 text-foreground/70" />
+                  <span className="text-foreground/70">Search...</span>
+                  <span className="ml-2 text-xs text-foreground/50 hidden sm:inline">(Ctrl+K)</span>
+                </Button>
+              )}
             </div>
             
             <ThemeToggle />
@@ -226,17 +231,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </div>
       </header>
       
-      {/* Search Overlay */}
-      {showSearch && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center pt-20 p-4">
-          <div className="w-full max-w-xl">
-            <CommandSearch />
-            <p className="text-center text-sm text-white/70 mt-4">
-              Press ESC to close
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Search in Mobile */}
+      <div className="md:hidden px-4 py-2">
+        <CommandSearch />
+      </div>
       
       <main className="flex-grow container mx-auto px-4 py-6">
         {children}

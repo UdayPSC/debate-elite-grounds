@@ -62,7 +62,7 @@
     --secondary-foreground: 210 40% 98%;
 
     --muted: 240 10% 18%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted-foreground: 215 20.2% 70%; /* Increased brightness for better visibility */
 
     --accent: 240 10% 18%;
     --accent-foreground: 210 40% 98%;
@@ -227,11 +227,11 @@
 
 /* Improved text visibility in debates for dark mode */
 .dark .glass-card {
-  @apply text-white/90;
+  @apply text-white;
 }
 
 .dark .text-muted-foreground {
-  @apply text-gray-300/80;
+  @apply text-gray-300;
 }
 
 /* Improved contrast for text in debate cards */
@@ -241,9 +241,10 @@
 
 .dark .text-foreground\/70,
 .dark .text-foreground\/80 {
-  @apply text-white/80;
+  @apply text-white/90;
 }
 
+/* Enhanced for extra visibility */
 .improved-dark-text .text-muted-foreground {
   @apply text-gray-300 !important;
 }
@@ -254,7 +255,24 @@
 
 .improved-dark-text .dark .text-foreground\/70,
 .improved-dark-text .dark .text-foreground\/80 {
-  @apply text-white/90 !important;
+  @apply text-white/95 !important;
+}
+
+/* Command component specific dark mode enhancements */
+.dark .cmdk-item {
+  @apply text-white;
+}
+
+.dark .cmdk-input {
+  @apply text-white;
+}
+
+.dark .cmdk-group-heading {
+  @apply text-white/80;
+}
+
+.dark .cmdk-empty {
+  @apply text-white/80;
 }
 
 /* Command dialog styles */
@@ -272,4 +290,32 @@ dialog {
 .dark input[type="email"],
 .dark input[type="password"] {
   @apply bg-black/40 text-white/90 border-white/10;
+}
+
+/* Enhanced link visibility in dark mode */
+.dark a {
+  @apply text-elitePurple/90 hover:text-elitePurple;
+}
+
+/* Additional improvements for cards and text in dark mode */
+.dark .card-title,
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  @apply text-white;
+}
+
+.dark p {
+  @apply text-gray-200;
+}
+
+.dark .text-foreground {
+  @apply text-white;
+}
+
+.dark [cmdk-group-heading] {
+  @apply text-white/80;
 }
