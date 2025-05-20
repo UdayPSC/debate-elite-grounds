@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -62,7 +61,7 @@
     --secondary-foreground: 210 40% 98%;
 
     --muted: 240 10% 18%;
-    --muted-foreground: 215 20.2% 70%; /* Increased brightness for better visibility */
+    --muted-foreground: 215 20.2% 80%; /* Increased brightness significantly for better visibility */
 
     --accent: 240 10% 18%;
     --accent-foreground: 210 40% 98%;
@@ -225,28 +224,34 @@
   }
 }
 
+/* Improved Dark Mode Text Visibility */
+.dark {
+  /* Search component styles */
+  --cmdk-shadow: 0 16px 70px rgb(0 0 0 / 0.2);
+}
+
 /* Improved text visibility in debates for dark mode */
 .dark .glass-card {
   @apply text-white;
 }
 
 .dark .text-muted-foreground {
-  @apply text-gray-300;
+  @apply text-gray-200; /* Significantly brighter than before */
 }
 
 /* Improved contrast for text in debate cards */
 .dark .badge {
-  @apply text-white border-white/20;
+  @apply text-white border-white/40; /* More visible border */
 }
 
 .dark .text-foreground\/70,
 .dark .text-foreground\/80 {
-  @apply text-white/90;
+  @apply text-white/95; /* Much higher opacity for better visibility */
 }
 
 /* Enhanced for extra visibility */
 .improved-dark-text .text-muted-foreground {
-  @apply text-gray-300 !important;
+  @apply text-gray-200 !important;
 }
 
 .improved-dark-text .glass-card {
@@ -255,7 +260,7 @@
 
 .improved-dark-text .dark .text-foreground\/70,
 .improved-dark-text .dark .text-foreground\/80 {
-  @apply text-white/95 !important;
+  @apply text-white !important; /* Maximum visibility */
 }
 
 /* Command component specific dark mode enhancements */
@@ -268,33 +273,55 @@
 }
 
 .dark .cmdk-group-heading {
-  @apply text-white/80;
+  @apply text-white/90; /* Increased visibility */
 }
 
 .dark .cmdk-empty {
-  @apply text-white/80;
+  @apply text-white/90; /* Increased visibility */
 }
 
-/* Command dialog styles */
-dialog::backdrop {
-  @apply bg-black/50 backdrop-blur-sm;
+/* Enhanced search results visibility */
+.dark [cmdk-group-heading] {
+  @apply text-white/90 font-medium; /* Brighter and bolder */
 }
 
-dialog {
-  @apply outline-none;
+.dark [cmdk-item] {
+  @apply text-white bg-transparent; /* Ensure text is white */
 }
 
-/* Enhanced textareas in dark mode */
-.dark textarea,
-.dark input[type="text"],
-.dark input[type="email"],
-.dark input[type="password"] {
-  @apply bg-black/40 text-white/90 border-white/10;
+.dark [cmdk-item][data-selected="true"] {
+  @apply bg-white/10; /* Better selection highlight */
 }
 
-/* Enhanced link visibility in dark mode */
-.dark a {
-  @apply text-elitePurple/90 hover:text-elitePurple;
+/* Dark mode command enhancement */
+.dark .Command {
+  @apply bg-dark-lighter border-white/10;
+}
+
+/* Remove default styles that might conflict with our new design */
+#root {
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* Modern Card Styling */
+.modern-card {
+  @apply backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl shadow-lg transition-all duration-300;
+}
+
+.modern-card:hover {
+  @apply shadow-xl border-white/20;
+}
+
+/* 3D Floating Elements */
+.floating-element {
+  animation: float 5s ease-in-out infinite;
+}
+
+/* Gradient Text */
+.gradient-text {
+  @apply bg-gradient-to-r from-elitePurple to-eliteBlue bg-clip-text text-transparent;
 }
 
 /* Additional improvements for cards and text in dark mode */
@@ -304,16 +331,30 @@ dialog {
 .dark h3,
 .dark h4,
 .dark h5,
-.dark h6 {
+.dark h5 {
   @apply text-white;
 }
 
 .dark p {
-  @apply text-gray-200;
+  @apply text-gray-100; /* Brighter text for paragraphs */
 }
 
 .dark .text-foreground {
   @apply text-white;
+}
+
+/* Special improvements for search results */
+.dark .CommandItem .text-foreground {
+  @apply text-white;
+}
+
+.dark .CommandItem .text-foreground\/90 {
+  @apply text-gray-200; /* Ensure description text is visible */
+}
+
+/* Ensure dialog backdrop is visible in dark mode */
+.dark dialog::backdrop {
+  @apply bg-black/70 backdrop-blur-sm; /* Darker backdrop for better contrast */
 }
 
 .dark [cmdk-group-heading] {

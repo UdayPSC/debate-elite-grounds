@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -126,20 +127,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </div>
           
           <div className="flex items-center space-x-4">
-            <div className="relative hidden md:block">
+            <div className="relative hidden md:block w-64">
               {showSearch ? (
-                <div className="absolute right-0 top-0 w-64">
-                  <CommandSearch />
-                </div>
+                <CommandSearch />
               ) : (
                 <Button 
                   variant="outline" 
-                  className="glass-button flex items-center px-4 py-2 rounded-full"
+                  className="glass-button flex items-center px-4 py-2 rounded-full w-full justify-between"
                   onClick={toggleSearch}
                 >
-                  <Search className="h-4 w-4 mr-2 text-foreground/70" />
-                  <span className="text-foreground/70">Search...</span>
-                  <span className="ml-2 text-xs text-foreground/50 hidden sm:inline">(Ctrl+K)</span>
+                  <div className="flex items-center">
+                    <Search className="h-4 w-4 mr-2 text-foreground" />
+                    <span className="text-foreground">Search...</span>
+                  </div>
+                  <span className="text-xs text-foreground/70 hidden sm:inline">(Ctrl+K)</span>
                 </Button>
               )}
             </div>
@@ -231,9 +232,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         </div>
       </header>
       
-      {/* Search in Mobile */}
+      {/* Update Mobile Search to match the same functionality */}
       <div className="md:hidden px-4 py-2">
-        <CommandSearch />
+        {showSearch ? (
+          <CommandSearch />
+        ) : (
+          <Button 
+            variant="outline" 
+            className="glass-button flex items-center px-4 py-2 rounded-full w-full justify-between"
+            onClick={toggleSearch}
+          >
+            <div className="flex items-center">
+              <Search className="h-4 w-4 mr-2 text-foreground" />
+              <span className="text-foreground">Search...</span>
+            </div>
+          </Button>
+        )}
       </div>
       
       <main className="flex-grow container mx-auto px-4 py-6">

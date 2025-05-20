@@ -18,8 +18,8 @@ interface ProfileData {
   full_name: string | null;
   avatar_url: string | null;
   bio: string | null;
-  location: string | null; 
-  website: string | null; // Added this field to match the form
+  location: string | null;
+  website: string | null; // Added this field explicitly to match the form and DB
   expertise_areas: string[] | null;
 }
 
